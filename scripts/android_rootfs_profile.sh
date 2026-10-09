@@ -103,6 +103,39 @@ bb_android_apply_process_affinity() {
     fi
 }
 
+# Rootfs system library directories. The wrapper's @LD_LIBRARY_PATH@ covers the packaged
+# closure only, and that closure's glibc does not search /usr/lib. An imported Linux/rootfs
+# Vulkan driver (Mesa Turnip needs libzstd, libxcb-*, libwayland-client, libxshmfence,
+# libdrm, ...) and the prebuilt bb-probe (libffi) resolve those from the rootfs's own
+# library directories, so they must be on the library path. Without them the Vulkan loader
+# silently drops the imported ICD ("Failed loading library associated with ICD JSON ...:
+# libzstd.so.1: cannot open shared object file") and window creation then fails with
+# "Installed Vulkan doesn't implement the VK_KHR_surface extension" - the import looks
+# ineffective even though the driver is selected and its ICD JSON is correct.
+BB_ANDROID_SYSTEM_LIBRARY_DIRS=${BB_ANDROID_SYSTEM_LIBRARY_DIRS:-/usr/local/lib:/usr/lib:/lib:/usr/lib64}
+export BB_ANDROID_SYSTEM_LIBRARY_DIRS
+
+bb_android_apply_library_path() {
+    bb_android_profile_enabled || return 0
+    [[ ${BB_ANDROID_LIBRARY_PATH_APPLIED:-0} == 1 ]] && return 0
+    local dirs=${BB_ANDROID_SYSTEM_LIBRARY_DIRS:-} dir
+    [[ -n $dirs ]] || return 0
+    for dir in ${dirs//:/ }; do
+        [[ -d $dir ]] || continue
+        # Append, never prepend: the packaged closure (and the imported driver's own
+        # directories) keep priority; these are fallbacks for the rootfs's system libs.
+        case ":${LD_LIBRARY_PATH:-}:" in
+            *":$dir:"*) continue ;;
+        esac
+        export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}${LD_LIBRARY_PATH:+:}$dir"
+    done
+    export BB_ANDROID_LIBRARY_PATH_APPLIED=1
+}
+
+# Apply this only right before the game/loader starts, never for the whole wrapper: the
+# packaged tooling runs on the closure's glibc, and the rootfs's older system libs (its
+# /usr/lib/libm.so.6 has no GLIBC_2.44) would break it (bbport-driver then dies with
+# "ImportError: /usr/lib/libm.so.6: version `GLIBC_2.44' not found").
 bb_android_apply_defaults() {
     bb_android_profile_enabled || return 0
     [[ ${BB_ANDROID_DEFAULTS_APPLIED:-0} == 1 ]] && return 0

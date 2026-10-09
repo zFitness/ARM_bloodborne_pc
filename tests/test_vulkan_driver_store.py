@@ -3,8 +3,10 @@
 from paths import ROOT  # noqa: F401 - adds scripts/ to sys.path.
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 import vulkan_driver_store as drivers
@@ -130,6 +132,51 @@ class VulkanDriverStoreTests(unittest.TestCase):
         self.assertEqual(drivers.list_drivers(env=self.env), [])
         with self.assertRaisesRegex(drivers.DriverError, "no Vulkan driver selected"):
             drivers.manifest_for(None, env=self.env)
+
+    def test_import_records_unresolved_libraries(self):
+        source = self.root / "driver"
+        self.make_driver(source)
+
+        manifest = drivers.import_driver(source, env=self.env, driver_id="drv")
+
+        # Kept even when empty so the manifest schema is stable.
+        self.assertEqual(manifest["unresolved_libraries"], [])
+
+    def test_import_reports_libraries_the_loader_cannot_resolve(self):
+        source = self.root / "driver"
+        self.make_driver(source)
+        result = subprocess.CompletedProcess(
+            args=["ldd"], returncode=0,
+            stdout="\tlibzstd.so.1 => not found\n\tlibc.so.6 => /usr/lib/libc.so.6\n",
+            stderr="")
+        with mock.patch.object(drivers.shutil, "which", return_value="/usr/bin/ldd"), \
+                mock.patch.object(drivers.subprocess, "run", return_value=result):
+            manifest = drivers.import_driver(source, env=self.env, driver_id="drv")
+
+        self.assertEqual(manifest["unresolved_libraries"], ["libzstd.so.1"])
+        self.assertTrue(any("libzstd.so.1" in note for note in manifest["notes"]))
+
+    def test_unresolved_libraries_is_quiet_without_ldd(self):
+        with mock.patch.object(drivers.shutil, "which", return_value=None):
+            self.assertEqual(drivers.unresolved_libraries(Path("/nonexistent/lib.so")), [])
+
+    def test_unresolved_libraries_checks_with_the_profile_library_path(self):
+        """The check must mirror the game's library path, or it warns about libs that resolve."""
+        libdir = self.root / "syslib"
+        libdir.mkdir()
+        env = {"LD_LIBRARY_PATH": "/closure/lib",
+               "BB_ANDROID_SYSTEM_LIBRARY_DIRS": f"{libdir}:{self.root / 'absent'}"}
+        captured = {}
+
+        def fake_run(argv, **kwargs):
+            captured["env"] = kwargs.get("env", {})
+            return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+        with mock.patch.object(drivers.shutil, "which", return_value="/usr/bin/ldd"), \
+                mock.patch.object(drivers.subprocess, "run", side_effect=fake_run):
+            drivers.unresolved_libraries(Path("/nowhere/lib.so"), env=env)
+
+        self.assertEqual(captured["env"]["LD_LIBRARY_PATH"], f"/closure/lib:{libdir}")
 
 
 if __name__ == "__main__":

@@ -55,12 +55,26 @@ else
 fi
 
 if [[ ${1:-} == --vulkan-info ]]; then
+    # Same library path as the game: the rootfs's own system libraries are not in the
+    # packaged closure, and this diagnostic would otherwise report the imported driver as
+    # broken ("Failed loading library associated with ICD JSON ...: libzstd.so.1").
+    if declare -F bb_android_apply_library_path >/dev/null; then
+        bb_android_apply_library_path
+    fi
     exec @VULKANINFO@ --summary
 fi
 
 if [[ -n ${BB_GAME_DIR:-} && ! -f $BB_GAME_DIR/eboot.bin ]]; then
     echo "No eboot.bin in BB_GAME_DIR=$BB_GAME_DIR." >&2
     exit 1
+fi
+
+# The rootfs's own system libraries are not part of the packaged closure: an imported
+# Linux/rootfs Vulkan driver (Mesa Turnip: libzstd, libxcb-*, libwayland-client, ...) and the
+# prebuilt bb-probe (libffi) resolve them from /usr/lib, which this runtime's glibc does not
+# search. Added here, after the packaged tooling (Python on the closure's glibc) has run.
+if declare -F bb_android_apply_library_path >/dev/null; then
+    bb_android_apply_library_path
 fi
 
 cd "$root"

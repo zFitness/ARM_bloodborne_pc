@@ -260,6 +260,53 @@ def unique_driver_id(store: Path, base: str, explicit: bool, force: bool) -> str
     return f"{driver_id}-{suffix}"
 
 
+DEFAULT_SYSTEM_LIBRARY_DIRS = "/usr/local/lib:/usr/lib:/lib:/usr/lib64"
+
+
+def system_library_dirs(env=os.environ) -> list[str]:
+    """The rootfs's own library directories (mirrors scripts/android_rootfs_profile.sh)."""
+    raw = env.get("BB_ANDROID_SYSTEM_LIBRARY_DIRS", DEFAULT_SYSTEM_LIBRARY_DIRS)
+    return [item for item in (raw or "").split(":") if item]
+
+
+def unresolved_libraries(library: Path, *, env=os.environ) -> list[str]:
+    """Names the dynamic linker cannot resolve for this ICD library at launch (best effort).
+
+    A driver whose dependencies are missing is still imported successfully, but the Vulkan
+    loader then drops it at launch ("Failed loading library associated with ICD JSON ...:
+    libzstd.so.1: cannot open shared object file") and the only visible symptom is an
+    unrelated window creation error. Reporting it here keeps a broken import from looking
+    like a working one.
+
+    Resolved with the library path the game will have: the Android rootfs profile adds the
+    rootfs's system library directories (BB_ANDROID_SYSTEM_LIBRARY_DIRS) right before the
+    loader starts, and the packaged closure's own glibc does not search them.
+    """
+    tool = shutil.which("ldd")
+    if tool is None:
+        return []
+    check_env = dict(env)
+    path = [item for item in (check_env.get("LD_LIBRARY_PATH") or "").split(":") if item]
+    for directory in system_library_dirs(env):
+        if directory not in path and Path(directory).is_dir():
+            path.append(directory)
+    if path:
+        check_env["LD_LIBRARY_PATH"] = ":".join(path)
+    try:
+        result = subprocess.run([tool, str(library)], capture_output=True, text=True,
+                                timeout=15, env=check_env)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    missing: list[str] = []
+    for line in (result.stdout or "").splitlines():
+        if "not found" not in line:
+            continue
+        name = line.split("=>")[0].strip().rstrip(":")
+        if name and name not in missing:
+            missing.append(name)
+    return missing
+
+
 def import_driver(path: Path, *, env=os.environ, driver_id: str | None = None,
                   label: str | None = None, set_default: bool = True,
                   force: bool = False) -> dict:
@@ -285,6 +332,15 @@ def import_driver(path: Path, *, env=os.environ, driver_id: str | None = None,
         icd_data["ICD"]["library_path"] = str(copied_lib.resolve())
         write_json(normalized, icd_data)
         library_dirs = sorted({str(p.parent.resolve()) for p in so_files(source)} | {str(copied_lib.parent.resolve())})
+        unresolved = unresolved_libraries(copied_lib, env=env)
+        notes = ["Linux/rootfs Vulkan ICD imported by bbport-driver."]
+        if unresolved:
+            notes.append(
+                "Unresolved libraries at import time: " + ", ".join(unresolved)
+                + ". The Vulkan loader will drop this ICD until they resolve; put the runtime's"
+                  " system library directories on LD_LIBRARY_PATH (the Android rootfs profile"
+                  " does this: scripts/android_rootfs_profile.sh, BB_ANDROID_SYSTEM_LIBRARY_DIRS)."
+            )
         manifest = {
             "id": final_id,
             "label": label or final_id,
@@ -293,7 +349,8 @@ def import_driver(path: Path, *, env=os.environ, driver_id: str | None = None,
             "icd_json": str(normalized.resolve()),
             "library_path": str(copied_lib.resolve()),
             "library_search_paths": library_dirs,
-            "notes": ["Linux/rootfs Vulkan ICD imported by bbport-driver."],
+            "unresolved_libraries": unresolved,
+            "notes": notes,
         }
         write_json(target / "manifest.json", manifest)
         index = load_index(store)
@@ -377,6 +434,13 @@ def cmd_import(args: argparse.Namespace) -> int:
         print(f"Selected: {manifest['id']}")
     else:
         print(f"Select with: bbport-driver select {manifest['id']}")
+    unresolved = manifest.get("unresolved_libraries") or []
+    if unresolved:
+        print("Warning: the Vulkan loader will drop this ICD until these resolve: "
+              + ", ".join(unresolved), file=sys.stderr)
+        print("  Put the runtime's system library directories on LD_LIBRARY_PATH"
+              " (Android rootfs profile: scripts/android_rootfs_profile.sh,"
+              " BB_ANDROID_SYSTEM_LIBRARY_DIRS).", file=sys.stderr)
     return 0
 
 
@@ -433,6 +497,11 @@ def print_selected(manifest: dict) -> None:
     print(f"ICD: {manifest['icd_json']}")
     if manifest.get("library_search_paths"):
         print("Library paths: " + ":".join(manifest["library_search_paths"]))
+    if manifest.get("unresolved_libraries"):
+        print("Unresolved libraries: " + ", ".join(manifest["unresolved_libraries"]))
+        print("  The Vulkan loader drops this ICD until they resolve; put the runtime's system"
+              " library directories on LD_LIBRARY_PATH"
+              " (Android rootfs profile: BB_ANDROID_SYSTEM_LIBRARY_DIRS).")
 
 
 if __name__ == "__main__":

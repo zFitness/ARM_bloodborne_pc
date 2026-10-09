@@ -208,6 +208,14 @@ else
     bash build.sh
     probe=${BB_PROBE:-out/bb-probe}  # BB_PROBE: a wrapper (gdb) around it
 fi
+# The rootfs's system libraries are not part of the packaged closure: an imported
+# Linux/rootfs Vulkan driver (Mesa Turnip: libzstd, libxcb-*, ...) and bb-probe itself
+# (libffi) resolve them from /usr/lib, which this runtime's glibc does not search. Added
+# here, after the Python tooling above, so that tooling keeps the closure's own glibc.
+# The wrapper already did this, and the helper is idempotent.
+if declare -F bb_android_apply_library_path >/dev/null; then
+    bb_android_apply_library_path
+fi
 probe_args=("$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" --app0 "$game" --user "${BB_USER_DIR:-$data/user}" --timeout "${BB_TIMEOUT:-0}" "$@")
 if [[ -n ${mod_game:-} ]]; then
     "$probe" "${probe_args[@]}" &
