@@ -7,11 +7,17 @@ on:
         description: 'JSON runs-on value. Default uses GitHub-hosted ARM64; use ["self-hosted","linux","arm64"] for your own runner.'
         required: true
         default: '"ubuntu-24.04-arm"'
+      release_tag:
+        description: 'Release tag to upload the tar to. Leave empty to skip release upload.'
+        required: false
+        default: 'turnip-tar-latest'
 
 jobs:
   build:
     name: Build minimal Turnip tar
     runs-on: ${{ fromJSON(inputs.runs_on) }}
+    permissions:
+      contents: write
 
     steps:
       - name: Check runner architecture
@@ -51,3 +57,19 @@ jobs:
           name: bbport-turnip-aarch64-tar
           path: dist/Bloodborne-bbport-turnip-aarch64.tar.gz
           if-no-files-found: error
+
+      - name: Upload tar to release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ARCHIVE: dist/Bloodborne-bbport-turnip-aarch64.tar.gz
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --title "$RELEASE_TAG" \
+              --notes "Minimal Turnip tar build from ${GITHUB_SHA}." \
+              --prerelease
+          fi
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" --clobber
