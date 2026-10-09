@@ -83,6 +83,12 @@ The default driver store is $BB_DATA_DIR/drivers. Android/AdrenoTools-only
 driver packages are not Linux/rootfs Vulkan ICD drivers and are rejected by the
 import command.
 
+The /opt/bbport/bin/bbport wrapper enables BB_ANDROID_ROOTFS_PROFILE=1 by
+default. Set BB_ANDROID_ROOTFS_PROFILE=0 for the plain runtime defaults, or set
+individual BB_* variables to override the profile. Keep BB_GAME_DIR,
+BB_DATA_DIR, shader cache and imported drivers on fast rootfs storage rather
+than /sdcard or other FUSE-backed paths.
+
 This package intentionally excludes Vulkan GPU drivers, the GTK launcher,
 Steam/AppImage entrypoints, MangoHud, FSR asset directories and FSR
 asset-building tools.

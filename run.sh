@@ -19,6 +19,13 @@ data=${BB_DATA_DIR:-.}
 out=$data/out
 mkdir -p "$out"
 export BB_CONFIG=${BB_CONFIG:-$data/bbport.ini}
+if [[ -f scripts/android_rootfs_profile.sh ]]; then
+    # Optional Android rootfs/proot performance profile. It is inactive unless
+    # BB_ANDROID_ROOTFS_PROFILE=1 is set by the rootfs wrapper or the user.
+    source scripts/android_rootfs_profile.sh
+    bb_android_apply_defaults
+    bb_android_apply_process_affinity
+fi
 # FSR 4.1.1 assets (tools/fsr4cap/build_assets.sh): next to run.sh or in the data directory.
 if [[ -z ${BB_FSR411_DIR:-} && ! -d fsr4_411 && -d $data/fsr4_411 ]]; then
     export BB_FSR411_DIR=$data/fsr4_411
@@ -53,6 +60,9 @@ if [[ -z ${PYTHON:-} ]]; then echo 'Install Python 3 or set PYTHON.' >&2; exit 1
 game=${BB_GAME_DIR:-../CUSA03173}
 if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set BB_GAME_DIR)." >&2; exit 1; fi
 original_game=$game
+if declare -F bb_android_storage_diagnostics >/dev/null; then
+    bb_android_storage_diagnostics "$game" "$data" "${BB_USER_DIR:-$data/user}" "${BB_DRIVER_STORE:-$data/drivers}"
+fi
 game=$("$PYTHON" scripts/mods.py "$game" --out "$out" \
     --mods-dir "${BB_MODS_DIR:-$data/mods}" --config "${BB_MODS_CONFIG:-$data/mods.json}" \
     --enabled "${BB_MODS_ENABLED:-1}")
@@ -106,8 +116,24 @@ if [[ $live == 1 ]]; then
     echo "Output ${scaled_output}: live resolution changes (live_resolution=0: startup patch)"
 elif [[ -n ${scaled_output:-} ]]; then
     export BB_RENDER_RES=$scaled_render BB_OUTPUT_RES=$scaled_output BB_AUTO_RENDER_RES=1
-    export BB_DMEM_MB=${BB_DMEM_MB:-9152}
-    echo "Output ${scaled_output}: scene ${scaled_render}, direct memory ${BB_DMEM_MB} MiB (live_resolution=1: live changes)"
+    high_res=0
+    for size in "$scaled_render" "$scaled_output"; do
+        if [[ $size =~ ^([0-9]+)x([0-9]+)$ ]] && (( BASH_REMATCH[1] * BASH_REMATCH[2] > 1920 * 1080 )); then
+            high_res=1
+        fi
+    done
+    if [[ -n ${BB_DMEM_MB+x} ]]; then
+        dmem_source=user
+    elif [[ $high_res == 1 ]]; then
+        export BB_DMEM_MB=9152
+        dmem_source=high-res-default
+    elif declare -F bb_android_profile_enabled >/dev/null && bb_android_profile_enabled; then
+        dmem_source=ps4-default
+    else
+        export BB_DMEM_MB=9152
+        dmem_source=legacy-default
+    fi
+    echo "Output ${scaled_output}: scene ${scaled_render}, direct memory ${BB_DMEM_MB:-5056} MiB (${dmem_source}; live_resolution=1: live changes)"
 fi
 "$PYTHON" scripts/patches.py --out "$out" --fps "$fps" --extra "${BB_PATCHES:-}" --settings "$BB_CONFIG" --game-dir "$game" --render-res "${BB_RENDER_RES:-}" --output-res "${BB_OUTPUT_RES:-}" \
     --patches-dir "${BB_PATCHES_DIR:-$data/patches}" --patches-config "${BB_PATCHES_CONFIG:-$data/patches.json}"
@@ -131,6 +157,9 @@ if [[ ${BB_AS_0_3:-0} == 1 ]]; then
     export BB_GUEST_IN_PLACE=0 BB_HOST_COPY_WAITS=all BB_PRODUCER_CHECK=1
 fi
 export BB_GUEST_IN_PLACE=${BB_GUEST_IN_PLACE:-${BB_PC_MODEL:-0}}
+if declare -F bb_android_runtime_summary >/dev/null; then
+    bb_android_runtime_summary
+fi
 # MangoHud (launcher switch: MANGOHUD=1) must be drawn once. Two overlays on top of each other
 # showed doubled, offset text: the Steam Deck's performance overlay (mangoapp, game mode) plus the
 # in-game layer, or the AppImage's bundled layer plus a system MangoHud (the layer names differ,

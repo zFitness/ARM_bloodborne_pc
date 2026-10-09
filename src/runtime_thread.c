@@ -1,10 +1,12 @@
 /* Guest threads on host pthreads. Each guest thread owns a FreeBSD-style TCB
  * (variant II: static TLS below the TCB). The loader rewrites the eboot's
  * `mov rax, fs:[0]` into `mov rax, gs:[0]`, so GS base = guest TCB while glibc
- * keeps FS. Priorities/affinity are recorded, not enforced by a PS4 scheduler. */
+ * keeps FS. Priorities/affinity are recorded and may be mapped best-effort to
+ * the host scheduler for Android rootfs/profile runs. */
 #define _GNU_SOURCE
 #include "runtime.h"
 #include "guest_cpu.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +16,7 @@
 #include <setjmp.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/mman.h>
 #define ERR(n) ((int32_t)(UINT32_C(0x80020000)|(n)))
@@ -39,6 +42,7 @@ typedef struct GuestThread {
     void *argument, *result;
     ThreadAttr attr;
     char name[32];
+    pid_t host_tid;
     unsigned char *guest_stack; /* separate from the host stack when the guest CPU is not the host's */
     size_t guest_stack_size;
     int detached, finished, joined, host_owned;
@@ -54,6 +58,12 @@ static _Thread_local int32_t guest_errno;
 static const unsigned char *tls_template;
 static uint64_t tls_filesz, tls_memsz, tls_align=16;
 static size_t created, joined_count, exited;
+
+static pthread_once_t sched_once=PTHREAD_ONCE_INIT;
+static cpu_set_t host_cpu_set;
+static int host_cpus[CPU_SETSIZE], host_cpu_count;
+static int have_host_cpu_set, map_guest_affinity, map_guest_prio, host_nice_valid, host_nice;
+static int sched_affinity_warned, sched_prio_warned;
 
 void runtime_set_main_tls(const void *data,uint64_t filesz,uint64_t memsz,uint64_t align) {
     tls_template=data; tls_filesz=filesz; tls_memsz=memsz; tls_align=align ? align : 16;
@@ -82,6 +92,93 @@ static GuestThread *new_thread(void) {
     t->attr=(ThreadAttr){.magic=ATTR_MAGIC,.policy=1,.prio=DEFAULT_PRIO,.stack=DEFAULT_STACK,.affinity=0x7f};
     return t;
 }
+static void add_host_cpu(int cpu) {
+    if (cpu<0 || cpu>=CPU_SETSIZE) return;
+    if (!CPU_ISSET(cpu,&host_cpu_set)) {
+        CPU_SET(cpu,&host_cpu_set);
+        if (host_cpu_count<(int)(sizeof(host_cpus)/sizeof(host_cpus[0]))) host_cpus[host_cpu_count++]=cpu;
+    }
+}
+static void parse_cpu_list(const char *list) {
+    const char *p=list;
+    while (p && *p) {
+        while (*p==',' || isspace((unsigned char)*p)) ++p;
+        if (!isdigit((unsigned char)*p)) break;
+        char *end=NULL;
+        long first=strtol(p,&end,10), last=first;
+        p=end;
+        if (*p=='-') {
+            ++p;
+            last=strtol(p,&end,10);
+            p=end;
+        }
+        if (first<=last) for (long cpu=first;cpu<=last;++cpu) add_host_cpu((int)cpu);
+        while (*p && *p!=',') ++p;
+    }
+}
+static int env_flag(const char *name) {
+    const char *v=getenv(name);
+    return v && v[0]=='1';
+}
+static void sched_init(void) {
+    CPU_ZERO(&host_cpu_set);
+    const char *cpus=getenv("BB_HOST_AFFINITY_CPUS");
+    if (!cpus || !*cpus) cpus=getenv("BB_BIG_CORES");
+    if (cpus && *cpus) {
+        parse_cpu_list(cpus);
+        have_host_cpu_set=host_cpu_count>0;
+        if (have_host_cpu_set) printf("Runtime: host CPU affinity profile cpus=%s\n",cpus);
+    }
+    map_guest_affinity=env_flag("BB_GUEST_AFFINITY_MAP");
+    map_guest_prio=env_flag("BB_GUEST_PRIO_NICE");
+    const char *nice=getenv("BB_HOST_THREAD_NICE");
+    if (nice && *nice) {
+        host_nice=atoi(nice);
+        if (host_nice<-20) host_nice=-20;
+        if (host_nice>19) host_nice=19;
+        host_nice_valid=1;
+    }
+}
+static void mapped_cpu_set(uint64_t guest,cpu_set_t *out) {
+    CPU_ZERO(out);
+    int added=0;
+    if (map_guest_affinity && guest) {
+        for (int i=0;i<host_cpu_count && i<64;++i) {
+            if (guest & (UINT64_C(1)<<i)) {
+                CPU_SET(host_cpus[i],out);
+                added=1;
+            }
+        }
+    }
+    if (!added) *out=host_cpu_set;
+}
+static void apply_host_sched(GuestThread *t,const char *why) {
+    pthread_once(&sched_once,sched_init);
+    if (have_host_cpu_set) {
+        cpu_set_t set;
+        mapped_cpu_set(t->attr.affinity,&set);
+        int e=pthread_setaffinity_np(t->host,sizeof(set),&set);
+        if (e && !sched_affinity_warned) {
+            fprintf(stderr,"Runtime: warning: host affinity for '%s' failed during %s: %d\n",
+                    t->name,why,e);
+            sched_affinity_warned=1;
+        }
+    }
+    int nice_value=0, apply_nice=0;
+    if (host_nice_valid) {
+        nice_value=host_nice; apply_nice=1;
+    } else if (map_guest_prio) {
+        nice_value=t->attr.prio<=500 ? -5 : (t->attr.prio<=700 ? 0 : 5);
+        apply_nice=1;
+    }
+    if (apply_nice && t->host_tid>0) {
+        if (setpriority(PRIO_PROCESS,t->host_tid,nice_value) && !sched_prio_warned) {
+            fprintf(stderr,"Runtime: warning: host priority for '%s' failed during %s: %s\n",
+                    t->name,why,strerror(errno));
+            sched_prio_warned=1;
+        }
+    }
+}
 static void publish(GuestThread *t) {
     pthread_mutex_lock(&lock); t->next=threads; threads=t; pthread_mutex_unlock(&lock);
 }
@@ -92,8 +189,10 @@ GuestThread *runtime_thread_current(void) {
     GuestThread *t=new_thread();
     if (!t) { fputs("Cannot allocate guest thread\n",stderr); exit(1); }
     t->host=pthread_self(); t->host_owned=1;
+    t->host_tid=(pid_t)syscall(SYS_gettid);
     snprintf(t->name,sizeof(t->name),"host");
     attach(t); publish(t);
+    apply_host_sched(t,"host attach");
     return t;
 }
 /* Host threads that call guest code (HLE decoders invoking guest callbacks) need
@@ -101,10 +200,12 @@ GuestThread *runtime_thread_current(void) {
 void runtime_thread_attach_host(const char *name) {
     GuestThread *t=runtime_thread_current();
     snprintf(t->name,sizeof(t->name),"%s",name ? name : "host");
+    apply_host_sched(t,"host rename");
 }
 void runtime_thread_attach_main(void) {
     GuestThread *t=runtime_thread_current();
     snprintf(t->name,sizeof(t->name),"main");
+    apply_host_sched(t,"main attach");
 }
 static GuestThread *find_thread(void *handle) {
     GuestThread *found=NULL;
@@ -218,8 +319,10 @@ static void set_host_name(const char *name) {
 }
 static void *host_start(void *p) {
     GuestThread *t=p;
+    t->host_tid=(pid_t)syscall(SYS_gettid);
     attach(t);
     set_host_name(t->name);
+    apply_host_sched(t,"thread start");
     if (t->guest_stack) guest_cpu_thread_stack(t->guest_stack+t->guest_stack_size,t->guest_stack_size);
     const uint64_t argument=(uint64_t)(uintptr_t)t->argument;
     if (!setjmp(t->exit_jump)) t->result=(void *)(uintptr_t)guest_cpu_call((uintptr_t)t->entry,1,&argument);
@@ -299,11 +402,11 @@ static ABI int32_t thread_get_prio(GuestThread *t,int *prio) {
 }
 static ABI int32_t thread_set_prio(GuestThread *t,int prio) {
     if (!find_thread(t)) return ERR(3);
-    t->attr.prio=prio; return 0;
+    t->attr.prio=prio; apply_host_sched(t,"guest priority change"); return 0;
 }
 static ABI int32_t thread_set_affinity(GuestThread *t,uint64_t mask) {
     if (!find_thread(t)) return ERR(3);
-    t->attr.affinity=mask; return 0;
+    t->attr.affinity=mask; apply_host_sched(t,"guest affinity change"); return 0;
 }
 static ABI int32_t thread_get_affinity(GuestThread *t,uint64_t *mask) {
     if (!find_thread(t)) return ERR(3);

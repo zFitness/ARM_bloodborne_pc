@@ -273,6 +273,17 @@ GPU driver: import a Linux/rootfs driver first, then run the game:
 BB_GAME_DIR=/path/to/CUSA03173 /opt/bbport/bin/bbport
 ```
 
+The `/opt/bbport/bin/bbport` wrapper enables `BB_ANDROID_ROOTFS_PROFILE=1` by
+default. This fills conservative mobile defaults only when the corresponding
+variable is unset: `BB_PREP_WORKERS=2`, `BB_COPY_THREADS=1`,
+`BB_VK_RECORD_THREADS=1`, `BB_PIPE_SPIN_US=20`, `BB_GPU_SPIN_US=0`,
+`BB_FRAMES_AHEAD=1`, `BB_FRAME_STATS=1` and `BB_PC_MODEL_PROBE_ANY_GPU=1`.
+Set `BB_ANDROID_ROOTFS_PROFILE=0` to get the plain runtime defaults, or set any
+of those variables yourself to override one value for a launch. Put
+`BB_GAME_DIR`, `BB_DATA_DIR`, the shader cache and the driver store on fast
+rootfs storage rather than `/sdcard`/FUSE-backed paths; the wrapper warns about
+slow or unwritable locations.
+
 Use `BB_VULKAN_DRIVER_ID=<id>` to select one imported driver for a launch,
 `BB_DRIVER_STORE=/path/to/drivers` to override the driver store, or
 `VK_DRIVER_FILES=/path/to/icd.json` for a low-level explicit ICD override.
@@ -321,8 +332,10 @@ When running from source, install MangoHud separately. A diagnostic launch with
 `VK_LOADER_LAYERS_DISABLE=~implicit~` also disables MangoHud.
 
 Useful variables: `BB_FRAME_STATS=1` (frame statistics, including a `Memory:` line: VRAM, GTT,
-RSS, images and guest blocks in VRAM), `BB_PC_MODEL=1` (the new memory and translation model,
-AMD only; 0, the old model as in 0.3, is the default), `BB_ANISO=N` (anisotropic filtering of scene textures; 16 by
+RSS, images and guest blocks in VRAM), `BB_PC_MODEL=1` (the new memory and translation model;
+AMD is enabled directly, Android rootfs profiles set `BB_PC_MODEL_PROBE_ANY_GPU=1` so Turnip-like
+drivers are tried only after the dma-buf/offset-mmap probe; `BB_PC_MODEL_ANY_GPU=1` forces the
+experimental path), `BB_ANISO=N` (anisotropic filtering of scene textures; 16 by
 default, 0 = the game's own),
 `BB_GC_IDLE_SECONDS=N` / `BB_VRAM_IDLE_SECONDS=N` (how long unused textures / buffers stay in VRAM;
 20 / 60), `BB_BREADCRUMBS=0` (no GPU breadcrumbs; with them a GPU hang names the draw or dispatch

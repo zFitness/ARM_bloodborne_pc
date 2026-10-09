@@ -17,7 +17,14 @@ export PYTHON=${PYTHON:-@PYTHON@}
 export PATH="@PATH@${PATH:+:$PATH}"
 export LD_LIBRARY_PATH="@LD_LIBRARY_PATH@${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export BB_DATA_DIR=${BB_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bbport}
+export BB_ANDROID_ROOTFS_PROFILE=${BB_ANDROID_ROOTFS_PROFILE:-1}
 mkdir -p "$BB_DATA_DIR"
+
+if [[ -f $root/scripts/android_rootfs_profile.sh ]]; then
+    source "$root/scripts/android_rootfs_profile.sh"
+    bb_android_apply_defaults
+    bb_android_apply_process_affinity
+fi
 
 driver_tool=$root/scripts/vulkan_driver_store.py
 if [[ ${1:-} == --driver ]]; then

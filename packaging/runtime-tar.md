@@ -44,6 +44,66 @@ Useful environment variables:
 - `VK_DRIVER_FILES`: lower-level Vulkan ICD override. If unset, the wrapper
   uses the selected imported driver and fails when none is available.
 - `BBPORT_ROOT`: override the runtime root when testing outside `/opt/bbport`.
+- `BB_ANDROID_ROOTFS_PROFILE`: Android/rootfs performance profile. The packaged
+  `/opt/bbport/bin/bbport` wrapper defaults it to `1`; set it to `0` for plain
+  runtime defaults.
+
+## Android rootfs performance profile
+
+When `BB_ANDROID_ROOTFS_PROFILE=1`, the wrapper and `run.sh` fill conservative
+mobile defaults only for variables the user did not set:
+
+```text
+BB_PREP_WORKERS=2
+BB_COPY_THREADS=1
+BB_VK_RECORD_THREADS=1
+BB_PIPE_SPIN_US=20
+BB_GPU_SPIN_US=0
+BB_FRAMES_AHEAD=1
+BB_FRAME_STATS=1
+BB_PC_MODEL_PROBE_ANY_GPU=1
+```
+
+Every value remains a normal environment-variable override. For a stronger SoC,
+try `BB_PREP_WORKERS=3` or `4` and `BB_VK_RECORD_THREADS=2`; for thermal or
+frame-time stability, reduce worker counts before increasing frames ahead.
+
+The profile tries to detect big cores from Linux CPU topology and exports
+`BB_HOST_AFFINITY_CPUS` for the runtime. You can provide it yourself, for
+example:
+
+```bash
+BB_HOST_AFFINITY_CPUS=4-7 BB_GAME_DIR=/games/CUSA03173 /opt/bbport/bin/bbport
+```
+
+Affinity and priority are best-effort: if the rootfs/proot environment does not
+allow `sched_setaffinity`, `taskset` or nice changes, the game still starts and
+prints a warning. Set `BB_ANDROID_ROOTFS_PROFILE=0` to disable the profile
+entirely for comparison.
+
+For startup-patched resolutions, 720p and 1080p keep the default PS4 direct
+memory size unless `BB_DMEM_MB` is set by the user. Outputs above 1080p still
+raise the default direct memory size for the high-resolution graphics heap path.
+
+## Storage and cache placement
+
+Keep `BB_GAME_DIR`, `BB_DATA_DIR`, shader cache and imported drivers on fast
+rootfs storage, such as an ext4/f2fs directory inside the rootfs/proot
+environment. Avoid `/sdcard`, `/storage/emulated/*` and FUSE-backed paths for
+the game dump or cache, because slow read/write and mmap behavior can show up as
+loading stutter or shader/pipeline cache stalls. The profile prints warnings for
+known slow or unwritable paths but does not move user data automatically.
+
+## PC memory model on Turnip-like drivers
+
+`BB_PC_MODEL=1` selects the new memory and translation model. AMD GPUs are still
+accepted directly. In the Android rootfs profile, non-AMD drivers use
+`BB_PC_MODEL_PROBE_ANY_GPU=1`: the runtime first checks for exportable cached
+system memory, dma-buf support and offset mmap behavior. If the probe fails,
+direct memory stays on the compatible path and the log explains why.
+
+`BB_PC_MODEL_ANY_GPU=1` remains a force switch for experiments. Use it only for
+A/B testing and include the startup log when reporting issues.
 
 Driver diagnostics:
 
@@ -75,5 +135,6 @@ bash packaging/check-runtime-tar.sh dist/Bloodborne-bbport-runtime-aarch64.tar.g
 ```
 
 Device validation is still required for real releases. Record the device, GPU,
-driver source/version, rootfs/proot environment and startup log when testing on
-hardware.
+driver source/version, rootfs/proot environment, startup log, Android rootfs
+profile summary, key `BB_*` overrides, `BB_FRAME_STATS` output and whether
+`BB_PC_MODEL=1` was enabled when testing on hardware.

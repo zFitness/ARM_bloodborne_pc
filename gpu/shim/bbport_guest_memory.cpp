@@ -127,11 +127,25 @@ bool PcModelGpu(const Vulkan::Instance& instance) {
         constexpr std::uint32_t AmdVendor = 0x1002;
         const std::uint32_t vendor = instance.GetVendorID();
         const char* any = std::getenv("BB_PC_MODEL_ANY_GPU");
-        if (vendor == AmdVendor || (any && any[0] == '1')) {
+        const char* probe_any = std::getenv("BB_PC_MODEL_PROBE_ANY_GPU");
+        if (vendor == AmdVendor) {
+            return true;
+        }
+        if (any && any[0] == '1') {
+            std::printf("Guest memory: BB_PC_MODEL_ANY_GPU=1 forces the new memory model on "
+                        "vendor 0x%04x (experimental)\n",
+                        vendor);
+            return true;
+        }
+        if (probe_any && probe_any[0] == '1') {
+            std::printf("Guest memory: probing the new memory model on vendor 0x%04x "
+                        "(BB_PC_MODEL_PROBE_ANY_GPU=1)\n",
+                        vendor);
             return true;
         }
         std::printf("Guest memory: the new memory model is tested on AMD GPUs only; this GPU "
-                    "(vendor 0x%04x) uses the model of 0.3 (BB_PC_MODEL_ANY_GPU=1: try it)\n",
+                    "(vendor 0x%04x) uses the model of 0.3 (BB_PC_MODEL_PROBE_ANY_GPU=1: "
+                    "probe it, BB_PC_MODEL_ANY_GPU=1: force it)\n",
                     vendor);
         return false;
     }();
