@@ -52,4 +52,10 @@ bash packaging/rootfs/scripts/test-build-rootfs.sh
 ## GitHub Actions
 
 `.github/workflows/rootfs.yml` builds the bbport runtime tar first, then packages
-the combined rootfs artifact from the same checkout.
+the combined rootfs from the same checkout. The workflow uploads both rootfs
+files to the requested GitHub Release tag:
+
+```text
+dist/bloodborne-droid-rootfs-aarch64-<version>.tar.zst
+dist/bloodborne-droid-rootfs-aarch64-<version>.json
+```

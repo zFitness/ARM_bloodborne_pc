@@ -16,8 +16,8 @@ on:
         required: false
         default: ''
       release_tag:
-        description: Release tag to upload rootfs files to. Leave empty to skip release upload.
-        required: false
+        description: Release tag to upload rootfs files to.
+        required: true
         default: 'rootfs-latest'
 
 jobs:
@@ -81,7 +81,6 @@ jobs:
           if-no-files-found: error
 
       - name: Upload rootfs to release
-        if: ${{ inputs.release_tag != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
