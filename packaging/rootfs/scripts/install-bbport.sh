@@ -18,13 +18,16 @@ elif [[ -n "${BBPORT_RUNTIME_TARBALL:-}" ]]; then
     echo "== bbport: extracting runtime $BBPORT_RUNTIME_TARBALL"
     bb_tar_extract "$BBPORT_RUNTIME_TARBALL" "$stage"
     if [[ ! -e "$stage/opt/bbport/bin/bbport-game" ]]; then
-        mkdir -p "$stage/opt/bbport/bin"
-        cat > "$stage/opt/bbport/bin/bbport-game" <<'EOF'
+        bbport_bin="$stage/opt/bbport/bin"
+        mkdir -p "$bbport_bin"
+        chmod u+w "$stage/opt" "$stage/opt/bbport" "$bbport_bin" 2>/dev/null || true
+        rm -f "$bbport_bin/bbport-game"
+        cat > "$bbport_bin/bbport-game" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 exec /opt/bbport/bin/bbport "$@"
 EOF
-        chmod 755 "$stage/opt/bbport/bin/bbport-game"
+        chmod 755 "$bbport_bin/bbport-game"
     fi
 else
     cat >&2 <<'EOF'

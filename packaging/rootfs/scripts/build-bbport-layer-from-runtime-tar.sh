@@ -49,13 +49,15 @@ bb_tar_extract "$runtime" "$tmp_stage"
     exit 2
 }
 
-mkdir -p "$tmp_stage/opt/bbport/bin"
-cat > "$tmp_stage/opt/bbport/bin/bbport-game" <<'EOF'
+bbport_bin="$tmp_stage/opt/bbport/bin"
+chmod u+w "$tmp_stage/opt" "$tmp_stage/opt/bbport" "$bbport_bin" 2>/dev/null || true
+rm -f "$bbport_bin/bbport-game"
+cat > "$bbport_bin/bbport-game" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 exec /opt/bbport/bin/bbport "$@"
 EOF
-chmod 755 "$tmp_stage/opt/bbport/bin/bbport-game"
+chmod 755 "$bbport_bin/bbport-game"
 
 mv "$tmp_stage" "$stage"
 

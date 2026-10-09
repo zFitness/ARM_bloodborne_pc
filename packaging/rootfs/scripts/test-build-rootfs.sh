@@ -58,6 +58,7 @@ chmod +x "$work/runtime/opt/bbport/bin/bbport" \
     "$work/runtime/opt/bbport/share/bbport/bin/bb-gpu-capabilities" \
     "$work/runtime/opt/bbport/share/bbport/bin/gpu/libbbgpu.so" \
     "$work/runtime/opt/bbport/share/bbport/bin/cpu/libbbcpu.so"
+chmod 555 "$work/runtime/opt" "$work/runtime/opt/bbport" "$work/runtime/opt/bbport/bin"
 
 bb_tar_create_zst "$work/base.tar.zst" "$work/base"
 tar -czf "$work/runtime.tar.gz" -C "$work/runtime" .
