@@ -41,7 +41,11 @@ libs=(out/bb-probe out/bb-gpu-capabilities out/gpu/libbbgpu.so out/fex/libbbcpu.
 } > packaging/runtime-paths.nix
 
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
+cleanup() {
+    chmod -R u+w "$work" 2>/dev/null || true
+    rm -rf "$work"
+}
+trap cleanup EXIT
 result=$work/result
 "${nix_build[@]}" "${include[@]}" packaging/turnip-tar.nix -o "$result" >/dev/null
 
