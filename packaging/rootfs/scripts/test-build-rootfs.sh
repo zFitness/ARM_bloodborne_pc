@@ -26,11 +26,7 @@ cat > "$work/base/usr/bin/gamescope" <<'EOF'
 #!/bin/sh
 exit 0
 EOF
-cat > "$work/base/usr/local/bin/droiddeck-session" <<'EOF'
-#!/bin/sh
-exit 0
-EOF
-chmod +x "$work/base/usr/bin/gamescope" "$work/base/usr/local/bin/droiddeck-session"
+chmod +x "$work/base/usr/bin/gamescope"
 
 cat > "$work/runtime/opt/bbport/bin/bbport" <<'EOF'
 #!/bin/sh

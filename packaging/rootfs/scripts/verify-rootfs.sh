@@ -18,7 +18,6 @@ check() {
 }
 
 check usr/bin/gamescope
-check usr/local/bin/droiddeck-session
 check usr/local/bin/bloodborne-launch
 check usr/local/share/bloodborne/default-bbport.ini
 check usr/local/share/bloodborne/default-env
