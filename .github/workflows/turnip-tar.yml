@@ -1,0 +1,49 @@
+name: Turnip tar
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs_on:
+        description: 'JSON runs-on value, for example ["self-hosted","linux","arm64"]'
+        required: true
+        default: '["self-hosted","linux","arm64"]'
+
+jobs:
+  build:
+    name: Build minimal Turnip tar
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
+
+    steps:
+      - name: Check runner architecture
+        run: |
+          set -euo pipefail
+          echo "Runner: $(uname -s) $(uname -m)"
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = aarch64
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build bbport runtime
+        run: nix-shell shell.nix --run 'bash build.sh'
+
+      - name: Build minimal Turnip tar
+        run: bash packaging/turnip-tar.sh
+
+      - name: Check tar contents
+        run: bash packaging/check-turnip-tar.sh dist/Bloodborne-bbport-turnip-aarch64.tar.gz
+
+      - name: Upload tar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bbport-turnip-aarch64-tar
+          path: dist/Bloodborne-bbport-turnip-aarch64.tar.gz
+          if-no-files-found: error
