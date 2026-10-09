@@ -2,6 +2,7 @@
  * renderer targets. The renderer needs both directions for live presets.
  * --gamepads: the connected gamepads, "GUID<tab>name" per line (the launcher's controller list,
  * BB_GAMEPAD). --read-input: one key or button for the launcher's controls (below). */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
