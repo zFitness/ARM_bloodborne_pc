@@ -33,9 +33,13 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: Build bbport runtime
-        run: nix-shell shell.nix --run 'bash build.sh'
+        env:
+          BB_NIXPKGS: channel:nixos-unstable
+        run: nix-shell -I nixpkgs=$BB_NIXPKGS shell.nix --run 'bash build.sh'
 
       - name: Build minimal Turnip tar
+        env:
+          BB_NIXPKGS: channel:nixos-unstable
         run: bash packaging/turnip-tar.sh
 
       - name: Check tar contents
