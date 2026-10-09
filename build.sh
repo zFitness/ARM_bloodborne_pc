@@ -54,12 +54,18 @@ gpu=(-Lout/gpu -lbbgpu -Wl,-rpath,'$ORIGIN/gpu' -Wl,-rpath,"$PWD/out/gpu" -rdyna
 # (cpu/: FEX's CMake project builds it, cpu/fex_project.cmake adds the target). FEX needs Clang.
 cpu=()
 if [[ $(uname -m) == aarch64 ]]; then
-    if [[ ! -f out/fex/build.ninja ]]; then
-        CC=${FEX_CC:-clang} CXX=${FEX_CXX:-clang++} cmake -S third_party/FEX -B out/fex -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release -DCMAKE_PROJECT_FEX_INCLUDE="$PWD/cpu/fex_project.cmake" \
-            -DBUILD_TESTING=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_STEAM_SUPPORT=OFF \
-            -DBUILD_FEX_LINUX_TESTS=OFF -DENABLE_ZYDIS=OFF -DTUNE_ARCH=armv8.2-a -DTUNE_CPU=generic >/dev/null
+    fex_ar=${FEX_AR:-$(command -v llvm-ar || command -v ar || true)}
+    fex_ranlib=${FEX_RANLIB:-$(command -v llvm-ranlib || command -v ranlib || true)}
+    if [[ -z $fex_ar || -z $fex_ranlib ]]; then
+        echo 'Need ar and ranlib for FEXCore build.' >&2; exit 1
     fi
+    CC=${FEX_CC:-clang} CXX=${FEX_CXX:-clang++} cmake -S third_party/FEX -B out/fex -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_PROJECT_FEX_INCLUDE="$PWD/cpu/fex_project.cmake" \
+        -DCMAKE_AR="$fex_ar" -DCMAKE_RANLIB="$fex_ranlib" \
+        -DCMAKE_C_COMPILER_AR="$fex_ar" -DCMAKE_C_COMPILER_RANLIB="$fex_ranlib" \
+        -DCMAKE_CXX_COMPILER_AR="$fex_ar" -DCMAKE_CXX_COMPILER_RANLIB="$fex_ranlib" \
+        -DBUILD_TESTING=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_STEAM_SUPPORT=OFF \
+        -DBUILD_FEX_LINUX_TESTS=OFF -DENABLE_ZYDIS=OFF -DTUNE_ARCH=armv8.2-a -DTUNE_CPU=generic >/dev/null
     if ! ninja -C out/fex bbcpu > out/fex-build.log 2>&1; then
         grep -v '^\[' out/fex-build.log | tail -40 >&2
         echo 'Guest CPU library build failed (full log: out/fex-build.log)' >&2; exit 1

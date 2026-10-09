@@ -11,4 +11,6 @@ pkgs.mkShell ({
   # Guest CPU library (cpu/: FEXCore) builds with Clang only (build.sh); the rest with GCC.
   FEX_CC = "${pkgs.clang}/bin/clang";
   FEX_CXX = "${pkgs.clang}/bin/clang++";
+  FEX_AR = "${pkgs.llvmPackages.llvm}/bin/llvm-ar";
+  FEX_RANLIB = "${pkgs.llvmPackages.llvm}/bin/llvm-ranlib";
 })
