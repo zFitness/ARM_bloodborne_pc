@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       runs_on:
-        description: 'JSON runs-on value, for example ["self-hosted","linux","arm64"]'
+        description: 'JSON runs-on value. Default uses GitHub-hosted ARM64; use ["self-hosted","linux","arm64"] for your own runner.'
         required: true
-        default: '["self-hosted","linux","arm64"]'
+        default: '"ubuntu-24.04-arm"'
 
 jobs:
   build:
