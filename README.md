@@ -261,15 +261,27 @@ the launcher's button (see above); they go to `~/.local/share/bbport/fsr4_411`
 (`BB_PACKAGE_FSR411=1` bundles a local `fsr4_411` into an AppImage for your own devices). On the Steam Deck pick the 1280×720 output (the
 game is 16:9; on the 1280×800 screen it gets thin bars).
 
-**Minimal Turnip tar** (ARM64 / Adreno rootfs or proot): `bash build.sh &&
-bash packaging/turnip-tar.sh` →
-`dist/Bloodborne-bbport-turnip-aarch64.tar.gz`. This package is a rootfs overlay
-with a command-line entry at `/opt/bbport/bin/bbport-turnip`; run it with
-`BB_GAME_DIR=/path/to/CUSA03173`. It bundles only the minimal bbport runtime and
-Turnip Vulkan path. It does not include the GTK launcher, Steam/AppImage
-entrypoints, MangoHud, FSR asset directories, FSR asset builders, AMD DLLs or
-game files. See `packaging/turnip-tar.md` for layout, environment variables and
-GitHub Actions notes.
+**Driverless runtime tar** (ARM64 rootfs or proot): `bash build.sh &&
+bash packaging/runtime-tar.sh` →
+`dist/Bloodborne-bbport-runtime-aarch64.tar.gz`. This package is a rootfs
+overlay with command-line entries at `/opt/bbport/bin/bbport` and
+`/opt/bbport/bin/bbport-driver`. It does not bundle Turnip or any other Vulkan
+GPU driver: import a Linux/rootfs driver first, then run the game:
+
+```bash
+/opt/bbport/bin/bbport-driver import /path/to/linux-vulkan-driver.zip
+BB_GAME_DIR=/path/to/CUSA03173 /opt/bbport/bin/bbport
+```
+
+Use `BB_VULKAN_DRIVER_ID=<id>` to select one imported driver for a launch,
+`BB_DRIVER_STORE=/path/to/drivers` to override the driver store, or
+`VK_DRIVER_FILES=/path/to/icd.json` for a low-level explicit ICD override.
+Android app / AdrenoTools-only driver packages are not Linux/rootfs ICD drivers;
+choose driver releases that include Linux ICD JSON and aarch64 driver libraries.
+The runtime tar does not include the GTK launcher, Steam/AppImage entrypoints,
+MangoHud, FSR asset directories, FSR asset builders, AMD DLLs or game files. See
+`packaging/runtime-tar.md` for layout, environment variables and GitHub Actions
+notes.
 
 **Adding the AppImage to Steam** (*Add a Non-Steam Game*) needs no options; the compatibility tool
 does not matter. (Steam preloads its overlay into every non-Steam game; the AppImage removes it

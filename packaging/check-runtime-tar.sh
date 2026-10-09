@@ -2,12 +2,11 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <turnip-tar-archive-or-staging-dir>" >&2
+    echo "Usage: $0 <runtime-tar-archive-or-staging-dir>" >&2
     exit 2
 fi
 
 target=$1
-tmp=
 if [[ -d $target ]]; then
     list=$(cd "$target" && find . -print | sed 's#^\./##' | sort)
 else
@@ -26,14 +25,6 @@ require() {
     fi
 }
 
-require_match() {
-    local pattern=$1
-    if ! grep -Eq "$pattern" <<< "$list"; then
-        echo "Missing required pattern: $pattern" >&2
-        exit 1
-    fi
-}
-
 forbid_match() {
     local pattern=$1
     if grep -Eq "$pattern" <<< "$list"; then
@@ -43,16 +34,17 @@ forbid_match() {
     fi
 }
 
-require "opt/bbport/bin/bbport-turnip"
+require "opt/bbport/bin/bbport"
+require "opt/bbport/bin/bbport-driver"
 require "opt/bbport/share/bbport/run.sh"
 require "opt/bbport/share/bbport/scripts/prepare.py"
 require "opt/bbport/share/bbport/scripts/patches.py"
+require "opt/bbport/share/bbport/scripts/vulkan_driver_store.py"
 require "opt/bbport/share/bbport/patches/Bloodborne.xml"
 require "opt/bbport/share/bbport/bin/bb-probe"
 require "opt/bbport/share/bbport/bin/bb-gpu-capabilities"
 require "opt/bbport/share/bbport/bin/gpu/libbbgpu.so"
 require "opt/bbport/share/bbport/bin/cpu/libbbcpu.so"
-require_match '^nix/store/[^/]+/share/vulkan/icd.d/freedreno_icd\.[^.]+\.json$'
 
 forbid_match '(^|/)launcher(/|$)'
 forbid_match '(^|/)fsr4_shaders(/|$)'
@@ -61,9 +53,9 @@ forbid_match '(^|/)tools/fsr4cap(/|$)'
 forbid_match '(^|/)tools/fetch_fsr4_assets\.sh$'
 forbid_match '(^|/)bbport-entry($|\.c$)'
 forbid_match '(^|/)MangoHud|(^|/)mangohud(/|$)'
-forbid_match '(^|/)nvidia_icd\.[^.]+\.json$'
-forbid_match '(^|/)radeon_icd\.[^.]+\.json$'
-forbid_match '(^|/)intel_icd\.[^.]+\.json$'
-forbid_match '(^|/)lvp_icd\.[^.]+\.json$'
+forbid_match '(^|/)share/vulkan/icd\.d/[^/]+\.json$'
+forbid_match '(^|/)(freedreno|radeon|intel|nvidia|lvp|lavapipe|panfrost|broadcom|asahi)_icd\.[^.]+\.json$'
+forbid_match '(^|/)libvulkan_(freedreno|radeon|intel|lvp|lavapipe|panfrost|broadcom|asahi|nvidia)[^/]*\.so'
+forbid_match '(^|/)libVkLayer_MESA[^/]*\.so'
 
-echo "Turnip tar contents OK: $target"
+echo "Driverless runtime tar contents OK: $target"

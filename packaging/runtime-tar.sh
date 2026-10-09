@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds dist/Bloodborne-bbport-turnip-<arch>.tar.gz for rootfs/proot use.
+# Builds dist/Bloodborne-bbport-runtime-<arch>.tar.gz for rootfs/proot use.
 # Run build.sh first on an aarch64 Linux host/runner.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/.."
@@ -18,13 +18,13 @@ if ! command -v readelf >/dev/null; then
     exit 1
 fi
 if ! command -v nix-build >/dev/null || ! command -v nix-store >/dev/null; then
-    echo 'Need Nix with nix-build and nix-store to build the Turnip tar closure.' >&2
+    echo 'Need Nix with nix-build and nix-store to build the driverless runtime closure.' >&2
     exit 1
 fi
 
 case "$(uname -s):$(uname -m)" in
     Linux:aarch64) ;;
-    *) echo 'minimal Turnip tar must be built on an aarch64 Linux host/runner.' >&2; exit 1 ;;
+    *) echo 'driverless runtime tar must be built on an aarch64 Linux host/runner.' >&2; exit 1 ;;
 esac
 
 read -r -a nix_build <<< "${NIX_BUILD:-nix-build}"
@@ -47,7 +47,7 @@ cleanup() {
 }
 trap cleanup EXIT
 result=$work/result
-"${nix_build[@]}" "${include[@]}" packaging/turnip-tar.nix -o "$result" >/dev/null
+"${nix_build[@]}" "${include[@]}" packaging/runtime-tar.nix -o "$result" >/dev/null
 
 stage=$work/stage
 mkdir -p "$stage/nix/store"
@@ -61,11 +61,11 @@ while IFS= read -r path; do
     esac
 done < <(nix-store -qR "$result_real")
 
-bash packaging/check-turnip-tar.sh "$stage"
+bash packaging/check-runtime-tar.sh "$stage"
 
 arch=$(uname -m)
 mkdir -p dist
-archive=dist/Bloodborne-bbport-turnip-$arch.tar.gz
+archive=dist/Bloodborne-bbport-runtime-$arch.tar.gz
 tar -C "$stage" --numeric-owner --owner=0 --group=0 -czf "$archive" .
-bash packaging/check-turnip-tar.sh "$archive"
+bash packaging/check-runtime-tar.sh "$archive"
 ls -lh "$archive"

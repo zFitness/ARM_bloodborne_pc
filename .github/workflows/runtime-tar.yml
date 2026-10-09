@@ -1,4 +1,4 @@
-name: Turnip tar
+name: Driverless runtime tar
 
 on:
   workflow_dispatch:
@@ -10,11 +10,11 @@ on:
       release_tag:
         description: 'Release tag to upload the tar to. Leave empty to skip release upload.'
         required: false
-        default: 'turnip-tar-latest'
+        default: 'runtime-tar-latest'
 
 jobs:
   build:
-    name: Build minimal Turnip tar
+    name: Build driverless runtime tar
     runs-on: ${{ fromJSON(inputs.runs_on) }}
     permissions:
       contents: write
@@ -43,19 +43,19 @@ jobs:
           BB_NIXPKGS: channel:nixos-unstable
         run: nix-shell -I nixpkgs=$BB_NIXPKGS shell.nix --run 'bash build.sh'
 
-      - name: Build minimal Turnip tar
+      - name: Build driverless runtime tar
         env:
           BB_NIXPKGS: channel:nixos-unstable
-        run: bash packaging/turnip-tar.sh
+        run: bash packaging/runtime-tar.sh
 
       - name: Check tar contents
-        run: bash packaging/check-turnip-tar.sh dist/Bloodborne-bbport-turnip-aarch64.tar.gz
+        run: bash packaging/check-runtime-tar.sh dist/Bloodborne-bbport-runtime-aarch64.tar.gz
 
       - name: Upload tar artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bbport-turnip-aarch64-tar
-          path: dist/Bloodborne-bbport-turnip-aarch64.tar.gz
+          name: bbport-runtime-aarch64-tar
+          path: dist/Bloodborne-bbport-runtime-aarch64.tar.gz
           if-no-files-found: error
 
       - name: Upload tar to release
@@ -63,13 +63,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          ARCHIVE: dist/Bloodborne-bbport-turnip-aarch64.tar.gz
+          ARCHIVE: dist/Bloodborne-bbport-runtime-aarch64.tar.gz
         run: |
           set -euo pipefail
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" \
               --title "$RELEASE_TAG" \
-              --notes "Minimal Turnip tar build from ${GITHUB_SHA}." \
+              --notes "Driverless ARM64 runtime tar build from ${GITHUB_SHA}." \
               --prerelease
           fi
           gh release upload "$RELEASE_TAG" "$ARCHIVE" --clobber
