@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "bloodborne-droid-rootfs",
+  "version": "@VERSION@",
+  "arch": "aarch64",
+  "base": {
+    "source": "The412Banner/winlator-contents",
+    "linuxfs": "@BASE_VERSION@"
+  },
+  "bbport": {
+    "source": "ARM_bloodborne_pc",
+    "commit": "@BBPORT_COMMIT@",
+    "entrypoint": "/usr/local/bin/bloodborne-launch"
+  },
+  "entrypoint": "/usr/local/bin/bloodborne-launch"
+}

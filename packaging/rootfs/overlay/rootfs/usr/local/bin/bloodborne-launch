@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export BB_DATA_DIR="${BB_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bbport}"
+export BB_CONFIG="${BB_CONFIG:-$BB_DATA_DIR/bbport.ini}"
+mkdir -p "$BB_DATA_DIR"
+
+default_ini=/usr/local/share/bloodborne/default-bbport.ini
+if [[ ! -f "$BB_CONFIG" && -f "$default_ini" ]]; then
+    cp "$default_ini" "$BB_CONFIG"
+fi
+
+default_env=/usr/local/share/bloodborne/default-env
+user_env="$BB_DATA_DIR/droiddeck-env"
+[[ -f "$default_env" ]] && source "$default_env"
+[[ -f "$user_env" ]] && source "$user_env"
+
+if [[ -z "${BB_GAME_DIR:-}" || ! -f "$BB_GAME_DIR/eboot.bin" ]]; then
+    echo "bloodborne-launch: set BB_GAME_DIR to a CUSA03173 directory containing eboot.bin" >&2
+    exit 66
+fi
+
+exec /opt/bbport/bin/bbport-game "$@"

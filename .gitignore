@@ -1,4 +1,5 @@
 out/
+.work/
 __pycache__/
 user/
 *.mp4

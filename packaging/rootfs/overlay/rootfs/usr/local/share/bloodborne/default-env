@@ -1,0 +1,7 @@
+# Sourced by /usr/local/bin/bloodborne-launch before the user's droiddeck-env.
+export BB_FPS="${BB_FPS:-60}"
+export BB_FPS_LIMIT="${BB_FPS_LIMIT:-60}"
+export BB_ANISO="${BB_ANISO:-8}"
+export BB_PREUPLOAD="${BB_PREUPLOAD:-1}"
+export BB_GUEST_IN_PLACE="${BB_GUEST_IN_PLACE:-0}"
+export BB_LIVE_RES="${BB_LIVE_RES:-0}"
