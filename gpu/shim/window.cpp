@@ -9,8 +9,21 @@
 
 namespace Frontend {
 
+//在最早的 SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD) 之前设置 DroidDeck SDL hint。
+// 这个很重要，因为窗口这里比 runtime_pad.c 更早初始化 SDL Gamepad
+static void DroidDeckSdlHints() {
+    if (!std::getenv("BB_DROIDDECK")) {
+        return;
+    }
+    setenv("SDL_EVDEV_DEVICES", "4:/dev/input/event0", 0); // SDL_UDEV_DEVICE_JOYSTICK
+    setenv("SDL_HIDAPI_UDEV", "0", 0);
+    unsetenv("SDL_JOYSTICK_LINUX_CLASSIC");
+    unsetenv("SDL_JOYSTICK_DISABLE_UDEV");
+}
+
 WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}, height{height_} {
     // Gamepads are sampled by runtime_pad.c; their events are pumped here with the window's.
+    DroidDeckSdlHints();
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         UNREACHABLE_MSG("Failed to initialize SDL video: {}", SDL_GetError());
     }

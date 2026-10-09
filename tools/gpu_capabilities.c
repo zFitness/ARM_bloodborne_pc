@@ -68,6 +68,13 @@ static int live_resolution_suits(VkPhysicalDevice device) {
 }
 
 static int list_gamepads(void) {
+    // launcher 刷新手柄列表时也使用同样配置。
+    if (getenv("BB_DROIDDECK")) {
+        setenv("SDL_EVDEV_DEVICES", "4:/dev/input/event0", 0); /* SDL_UDEV_DEVICE_JOYSTICK */
+        setenv("SDL_HIDAPI_UDEV", "0", 0);
+        unsetenv("SDL_JOYSTICK_LINUX_CLASSIC");
+        unsetenv("SDL_JOYSTICK_DISABLE_UDEV");
+    }
     if (!SDL_Init(SDL_INIT_GAMEPAD)) {
         fprintf(stderr, "gamepads: %s\n", SDL_GetError());
         return 1;

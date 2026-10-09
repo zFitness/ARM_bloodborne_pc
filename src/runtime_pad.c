@@ -73,6 +73,13 @@ static void touch_click(PadData *d, int right) {
     d->touch_count=1;
     d->touches[0]=(PadTouch){.x=right ? 1440 : 480,.y=471,.id=0};
 }
+static void droiddeck_sdl_hints(void) {
+    if (!getenv("BB_DROIDDECK")) return;
+    setenv("SDL_EVDEV_DEVICES","4:/dev/input/event0",0); /* SDL_UDEV_DEVICE_JOYSTICK */
+    setenv("SDL_HIDAPI_UDEV","0",0);
+    unsetenv("SDL_JOYSTICK_LINUX_CLASSIC");
+    unsetenv("SDL_JOYSTICK_DISABLE_UDEV");
+}
 
 /* BB_GAMEPAD (the launcher's controller choice): its SDL GUID, or part of its name. Issue #15:
  * wheels and other controllers connected for good came first. */
@@ -91,6 +98,7 @@ static int is_preferred(SDL_JoystickID id, const char *want) {
  * is taken as soon as it connects); called under lock. */
 static SDL_Gamepad *current_gamepad(void) {
     static int on_preferred; static uint64_t last_scan;
+    droiddeck_sdl_hints();
     if (!sdl_ready) sdl_ready = SDL_WasInit(SDL_INIT_GAMEPAD) ? 1 : SDL_InitSubSystem(SDL_INIT_GAMEPAD) ? 1 : -1;
     if (sdl_ready<0) return NULL;
     if (gamepad && !SDL_GamepadConnected(gamepad)) { SDL_CloseGamepad(gamepad); gamepad=NULL; }
