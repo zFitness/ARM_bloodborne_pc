@@ -11,6 +11,8 @@
 #include <signal.h>
 #if defined(__x86_64__)
 #define GUEST_CPU_NATIVE 1
+#elif defined(__aarch64__)
+#define GUEST_CPU_FEX 1
 #endif
 #ifdef __cplusplus
 extern "C" {

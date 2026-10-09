@@ -6,9 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include <cpuid.h>
-#include "runtime.h"
 #include "guest_cpu.h"
+#ifdef GUEST_CPU_NATIVE
+#include <cpuid.h>
+#endif
+#include "runtime.h"
 #include "gpu/bbgpu.h"
 #if !defined(__GNUC__) || (!defined(__x86_64__) && defined(_WIN32))
 #error This prototype requires GCC or Clang, on x86-64 for MinGW.
@@ -49,6 +51,7 @@ static void fail(const char *message) { fprintf(stderr, "ERROR: %s\n", message);
  * them stops at the first one with SIGILL (exit code 132, issue #26), and lzcnt/tzcnt even run as
  * bsr/bsf there, with other results. Said before the game starts; BB_SKIP_CPU_CHECK=1 skips it. */
 static void check_cpu(void) {
+#ifdef GUEST_CPU_NATIVE
     const char *skip = getenv("BB_SKIP_CPU_CHECK");
     if (skip && !strcmp(skip, "1")) return;
     unsigned a, b, c, d, leaf1_c = 0, leaf7_b = 0, ext1_c = 0;
@@ -78,6 +81,7 @@ static void check_cpu(void) {
             "these instructions directly: it needs an Intel Haswell (4th generation Core, 2013) or "
             "newer, or an AMD Ryzen. BB_SKIP_CPU_CHECK=1 starts anyway.\n", missing);
     exit(1);
+#endif
 }
 static uint64_t read64(FILE *f) {
     unsigned char b[8];
@@ -603,9 +607,11 @@ int main(int argc, char **argv) {
     ((Entry)(image + entry))(&params, guest_exit);
 #elif defined(GUEST_CPU_NATIVE)
     enter_on_stack(image+entry,&params,(void *)guest_exit,stack+MAIN_STACK-64);
-#else
+#elif defined(GUEST_CPU_FEX)
     const uint64_t entry_args[2]={(uint64_t)(uintptr_t)&params,guest_cpu_host_function((void *)guest_exit)};
     guest_cpu_call((uintptr_t)(image+entry),2,entry_args);
+#else
+#error Unsupported guest CPU backend.
 #endif
     fail("entry unexpectedly returned");
 }
