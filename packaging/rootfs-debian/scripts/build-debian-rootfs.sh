@@ -69,6 +69,11 @@ fi
 echo "== debian rootfs: trim"
 "$script_dir/trim-rootfs.sh" "$stage"
 
+echo "== debian rootfs: guest home"
+# The game (shadPS4 cache) and libs use non-recursive std::filesystem::create_directory on
+# $HOME/.local/share/...; the parent must exist. root does not help. Ship the XDG dirs.
+mkdir -p "$stage/root/.local/share" "$stage/root/.config" "$stage/root/.cache"
+
 echo "== debian rootfs: verify"
 BB_DEBIAN_SUITE="$suite" "$script_dir/verify-rootfs.sh" "$stage"
 

@@ -22,7 +22,13 @@ export LD_LIBRARY_PATH="$root/compat${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export LD_LIBRARY_PATH="@LD_LIBRARY_PATH@${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export BB_DATA_DIR=${BB_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bbport}
 export BB_ANDROID_ROOTFS_PROFILE=${BB_ANDROID_ROOTFS_PROFILE:-1}
-mkdir -p "$BB_DATA_DIR"
+# The game's shadPS4 cache and other components create $HOME/.local/share/<app> with a
+# non-recursive create_directory; the parent XDG dirs must already exist (root does not
+# help). Create them so a fresh rootfs launches without any user setup.
+mkdir -p "$BB_DATA_DIR" \
+    "${XDG_DATA_HOME:-$HOME/.local/share}" \
+    "${XDG_CONFIG_HOME:-$HOME/.config}" \
+    "${XDG_CACHE_HOME:-$HOME/.cache}"
 
 if [[ -f $root/scripts/android_rootfs_profile.sh ]]; then
     source "$root/scripts/android_rootfs_profile.sh"

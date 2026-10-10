@@ -57,14 +57,23 @@ bb_tar_extract() {
     esac
 }
 
+# Packs a staged rootfs so it can be extracted by an unprivileged Android user with a plain
+# `tar -xf`:
+#   --hard-dereference  stores hard-link members as independent copies. Android's untrusted-app
+#                       SELinux policy rejects link(2) on app-private storage, so a tar with
+#                       hard links (perl, terminfo, ...) aborts the extractor with EPERM.
+#   --exclude=./dev/*   drops device nodes. An unprivileged extractor cannot mknod them and a
+#                       proot consumer binds the host /dev anyway; the (now empty) /dev dir is
+#                       kept.
 bb_tar_create_zst() {
     local archive=$1 source_dir=$2
     mkdir -p "$(dirname -- "$archive")"
+    local pack=(--hard-dereference --exclude=./dev/*)
     if bb_tar_supports_zstd; then
-        tar --zstd -cf "$archive" -C "$source_dir" .
+        tar "${pack[@]}" --zstd -cf "$archive" -C "$source_dir" .
     else
         command -v zstd >/dev/null 2>&1 || { echo "Need zstd to create $archive." >&2; return 69; }
-        tar -cf - -C "$source_dir" . | zstd -T0 -19 -f -o "$archive"
+        tar "${pack[@]}" -cf - -C "$source_dir" . | zstd -T0 -19 -f -o "$archive"
     fi
 }
 
