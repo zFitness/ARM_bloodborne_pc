@@ -17,7 +17,12 @@
 # with `proot -r <dir> /opt/bbport/bin/bbport` — no host-system libraries
 # required.
 set -euo pipefail
-cd -- "$(dirname -- "$0")/.."
+# Build the repo root path correctly. This script lives at
+# packaging/nix-rootfs/build-nix-rootfs.sh, so two dirname steps are needed to
+# get back to the repo root (the parallel packaging/runtime-tar.sh only needs
+# one). The previous /.. landed us in packaging/ and out/bb-probe resolved
+# under packaging/out/bb-probe, which does not exist.
+cd -- "$(dirname -- "$0")/../.."
 repo_root="$PWD"
 
 arch=$(uname -m)
