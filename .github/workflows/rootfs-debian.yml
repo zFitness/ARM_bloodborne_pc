@@ -28,7 +28,7 @@ on:
       release_tag:
         description: Release tag to upload rootfs files to. Empty skips the upload.
         required: false
-        default: ''
+        default: 'debian-rootfs-latest'
 
 jobs:
   build:
