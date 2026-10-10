@@ -35,12 +35,30 @@ let
     pkgs.procps
     pkgs.util-linux
   ];
+  # External Vulkan drivers (Turnip and friends) are imported by the user and resolve their
+  # DT_NEEDED entirely through LD_LIBRARY_PATH (their ICDs carry no RUNPATH). Ship the common
+  # driver dependencies in a stable compat/ directory so an imported driver needs no manual
+  # library-path setup, and keep them on the same nix glibc as the runtime so they are never
+  # mixed with the base rootfs's older copies (which broke Turnip with a missing
+  # wl_fixes_interface and libxkbcommon V_1.10.0).
+  compatLibs = [
+    pkgs.wayland
+    pkgs.zlib
+    pkgs.zstd
+    pkgs.libdrm
+    pkgs.libxcb
+    pkgs.libX11
+    pkgs.libxkbcommon
+    pkgs.libxshmfence
+    pkgs.stdenv.cc.cc.lib
+    pkgs.glibc
+  ];
 in
 pkgs.stdenv.mkDerivation {
   pname = "bbport-runtime-rootfs";
   version = "0.1";
   inherit src;
-  buildInputs = [ pkgs.vulkan-loader pkgs.vulkan-tools ] ++ runtimeStorePaths;
+  buildInputs = [ pkgs.vulkan-loader pkgs.vulkan-tools ] ++ runtimeStorePaths ++ compatLibs;
   dontBuild = true;
   dontConfigure = true;
   dontPatchELF = true;
@@ -69,6 +87,30 @@ pkgs.stdenv.mkDerivation {
     substitute ${./runtime-driver.sh} $out/opt/bbport/bin/bbport-driver \
       --replace-fail @PYTHON@ ${python}/bin/python3
     chmod +x $out/opt/bbport/bin/bbport-driver
+
+    # compat/: driver dependency search directory. The entry wrapper puts it first on
+    # LD_LIBRARY_PATH so an imported Linux/Turnip ICD loads with no user configuration.
+    compat=$d/compat
+    mkdir -p $compat
+    link_compat() {
+        local dir=$1; shift
+        local g f
+        for g in "$@"; do
+            for f in $dir/$g; do
+                [ -e "$f" ] && ln -sf "$f" $compat/ || true
+            done
+        done
+    }
+    link_compat ${pkgs.wayland}/lib 'libwayland-client.so*' 'libwayland-egl.so*'
+    link_compat ${pkgs.zlib}/lib 'libz.so*'
+    link_compat ${pkgs.zstd}/lib 'libzstd.so*'
+    link_compat ${pkgs.libdrm}/lib 'libdrm.so*'
+    link_compat ${pkgs.libxcb}/lib 'libxcb.so*' 'libxcb-*.so*'
+    link_compat ${pkgs.libX11}/lib 'libX11-xcb.so*'
+    link_compat ${pkgs.libxkbcommon}/lib 'libxkbcommon.so*' 'libxkbcommon-x11.so*' 'libxkbregistry.so*'
+    link_compat ${pkgs.libxshmfence}/lib 'libxshmfence.so*'
+    link_compat ${pkgs.stdenv.cc.cc.lib}/lib 'libstdc++.so*'
+    link_compat ${pkgs.glibc}/lib 'libc.so.6'
 
     cat > $out/opt/bbport/README-runtime-tar.txt <<'DOC'
 bbport driverless runtime package

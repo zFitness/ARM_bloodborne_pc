@@ -45,10 +45,21 @@ fi
 echo "== verify: bbport layout"
 for path in \
     opt/bbport/bin/bbport \
-    opt/bbport/bin/bbport-game \
     opt/bbport/share/bbport/bin/bb-probe \
     opt/bbport/share/bbport/bin/bb-gpu-capabilities \
     opt/bbport/share/bbport/bin/gpu/libbbgpu.so
+do
+    [[ -e $stage/$path ]] && ok "$path" || bad "$path"
+done
+# Single launch entry: no bbport-game alias, no bloodborne-launch overlay.
+[[ -e $stage/opt/bbport/bin/bbport-game ]] && nope "opt/bbport/bin/bbport-game (single entry only)" || ok "no bbport-game alias"
+[[ -e $stage/usr/local/bin/bloodborne-launch ]] && nope "usr/local/bin/bloodborne-launch (single entry only)" || ok "no bloodborne-launch shim"
+# Driver compat directory: an imported external Vulkan driver resolves its DT_NEEDED from here.
+for path in \
+    opt/bbport/share/bbport/compat/libwayland-client.so.0 \
+    opt/bbport/share/bbport/compat/libxkbcommon.so.0 \
+    opt/bbport/share/bbport/compat/libz.so.1 \
+    opt/bbport/share/bbport/compat/libstdc++.so.6
 do
     [[ -e $stage/$path ]] && ok "$path" || bad "$path"
 done

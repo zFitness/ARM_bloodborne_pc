@@ -4,9 +4,9 @@ This rootfs contains the bbport runtime and nothing else you did not put there.
 
 ## What is here
 
-- `/opt/bbport` — the runtime: `bin/bbport` is the entry point, `bin/bbport-driver`
-  manages imported Vulkan drivers, `share/bbport/` holds the runtime scripts.
-- `/usr/local/bin/bloodborne-launch` — prepares a data directory and starts the runtime.
+- `/opt/bbport` — the runtime: `bin/bbport` is the single entry point, `bin/bbport-driver`
+  manages imported Vulkan drivers, `share/bbport/` holds the runtime scripts, and
+  `share/bbport/compat/` supplies the libraries an imported Vulkan driver needs.
 - `apt` — a normal Debian package manager.
 
 ## What is not here
@@ -27,11 +27,12 @@ or import a Linux/rootfs driver package:
 
 `bbport-driver` rejects Android-app and AdrenoTools-only packages: those inject into
 Android's graphics stack and expose no Linux Vulkan ICD. You need a package containing
-ICD JSON files and aarch64 driver libraries.
+ICD JSON files and aarch64 driver libraries. Imported drivers need no manual
+`LD_LIBRARY_PATH`: the entry already searches `share/bbport/compat/` first.
 
 ## Running
 
-    BB_GAME_DIR=/games/CUSA03173 /usr/local/bin/bloodborne-launch
+    BB_GAME_DIR=/games/CUSA03173 /opt/bbport/bin/bbport
 
 Useful environment variables:
 

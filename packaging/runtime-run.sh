@@ -15,6 +15,10 @@ export BB_PREBUILT=1
 export BB_PROBE=${BB_PROBE:-$root/bin/bb-probe}
 export PYTHON=${PYTHON:-@PYTHON@}
 export PATH="@PATH@${PATH:+:$PATH}"
+# compat/ first: an imported external Vulkan driver (Turnip/…) resolves its DT_NEEDED purely
+# through LD_LIBRARY_PATH and must hit the runtime's own nix libs before the base rootfs's
+# older copies. Packed at build time by packaging/runtime-tar.nix.
+export LD_LIBRARY_PATH="$root/compat${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export LD_LIBRARY_PATH="@LD_LIBRARY_PATH@${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export BB_DATA_DIR=${BB_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bbport}
 export BB_ANDROID_ROOTFS_PROFILE=${BB_ANDROID_ROOTFS_PROFILE:-1}

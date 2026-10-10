@@ -273,6 +273,11 @@ GPU driver: import a Linux/rootfs driver first, then run the game:
 BB_GAME_DIR=/path/to/CUSA03173 /opt/bbport/bin/bbport
 ```
 
+The package ships a driver dependency directory at `/opt/bbport/share/bbport/compat`
+and the `/opt/bbport/bin/bbport` entry searches it first, so an imported
+Linux/Turnip driver loads with no manual `LD_LIBRARY_PATH` setup. `/opt/bbport/bin/bbport`
+is the single launch entry (there is no `bbport-game` alias or `bloodborne-launch` shim).
+
 The `/opt/bbport/bin/bbport` wrapper enables `BB_ANDROID_ROOTFS_PROFILE=1` by
 default. This fills conservative mobile defaults only when the corresponding
 variable is unset: `BB_PREP_WORKERS=2`, `BB_COPY_THREADS=1`,

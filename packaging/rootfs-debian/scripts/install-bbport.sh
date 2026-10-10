@@ -31,17 +31,8 @@ bb_tar_extract "$runtime" "$stage"
     exit 2
 }
 
-# bbport-game is the entry name the packaged layout and the DroidDeck launcher expect.
-# runtime-tar.sh already ships one, but create it if this tarball predates that.
-if [[ ! -x $stage/opt/bbport/bin/bbport-game ]]; then
-    cat > "$stage/opt/bbport/bin/bbport-game" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-exec /opt/bbport/bin/bbport "$@"
-EOF
-    chmod 755 "$stage/opt/bbport/bin/bbport-game"
-fi
-chmod 755 "$stage/opt/bbport/bin/bbport" "$stage/opt/bbport/bin/bbport-game"
+# /opt/bbport/bin/bbport is the single launch entry. No bbport-game alias is created.
+chmod 755 "$stage/opt/bbport/bin/bbport"
 
 echo "== bbport: installed"
 find "$stage/opt/bbport" -maxdepth 4 -type f -name '*.so' -o -type f -name 'bb-probe' \

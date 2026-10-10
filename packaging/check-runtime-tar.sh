@@ -46,6 +46,8 @@ require "opt/bbport/share/bbport/bin/bb-probe"
 require "opt/bbport/share/bbport/bin/bb-gpu-capabilities"
 require "opt/bbport/share/bbport/bin/gpu/libbbgpu.so"
 require "opt/bbport/share/bbport/bin/cpu/libbbcpu.so"
+require "opt/bbport/share/bbport/compat/libwayland-client.so.0"
+require "opt/bbport/share/bbport/compat/libxkbcommon.so.0"
 
 forbid_match '(^|/)launcher(/|$)'
 forbid_match '(^|/)fsr4_shaders(/|$)'

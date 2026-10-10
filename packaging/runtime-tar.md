@@ -33,6 +33,19 @@ Import a Linux/rootfs Vulkan driver before launching:
 BB_GAME_DIR=/path/to/CUSA03173 /opt/bbport/bin/bbport
 ```
 
+`/opt/bbport/bin/bbport` is the single launch entry; the archive does not include a
+`bbport-game` alias or a `bloodborne-launch` shim.
+
+The archive ships `/opt/bbport/share/bbport/compat`, a directory of the libraries an
+external Vulkan driver resolves at load time (wayland, zlib, zstd, libdrm, libxcb,
+libX11-xcb, libxkbcommon, libstdc++, glibc, libxshmfence). The entry puts this directory
+first on `LD_LIBRARY_PATH`, so an imported Linux/Turnip driver loads with no manual
+library-path configuration and never mixes with older copies from the base rootfs.
+
+An already-extracted rootfs from before this change does not contain `compat/`: rebuild the
+runtime tar and rootfs, or add the same library links under `/opt/bbport/share/bbport/compat`
+by hand.
+
 Useful environment variables:
 
 - `BB_GAME_DIR`: Bloodborne dump directory containing `eboot.bin`.
