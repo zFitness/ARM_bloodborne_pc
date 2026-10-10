@@ -23,17 +23,12 @@
   # Store paths the prebuilt bbport ELF RUNPATHs reference, written by
   # packaging/runtime-tar.sh. nix-rootfs uses the same list because the bbport
   # binaries are identical.
-, runtimePaths ? (if builtins.pathExists ./../runtime-paths.nix then import ./../runtime-paths.nix else [ ])
+, runtimePaths ? (if builtins.pathExists ./runtime-paths.nix then import ./runtime-paths.nix else [ ])
 }:
 let
   lib = pkgs.lib;
   arm = pkgs.stdenv.hostPlatform.isAarch64;
-  # This file lives at packaging/nix-rootfs/nix-rootfs.nix. ./../.. is the repo
-  # root, which holds run.sh, scripts/, patches/, out/, and packaging/runtime-paths.nix.
-  # The original runtime-tar.nix lives at packaging/runtime-tar.nix and only
-  # needed ./.. — one level up. Going one more level fixes the path resolution
-  # for both the source filter and the ${../../out/...} install rules.
-  root = ./../..;
+  root = ./..;
   src = builtins.path {
     name = "bbport-nix-rootfs-src";
     path = root;
@@ -91,10 +86,10 @@ pkgs.stdenv.mkDerivation {
 
     cp run.sh $d/
     cp -r scripts patches $d/
-    install -m755 ${../../out/bb-probe} $d/bin/bb-probe
-    install -m755 ${../../out/bb-gpu-capabilities} $d/bin/bb-gpu-capabilities
-    install -m755 ${../../out/gpu/libbbgpu.so} $d/bin/gpu/libbbgpu.so
-    install -m755 ${../../out/fex/libbbcpu.so} $d/bin/cpu/libbbcpu.so
+    install -m755 ${../out/bb-probe} $d/bin/bb-probe
+    install -m755 ${../out/bb-gpu-capabilities} $d/bin/bb-gpu-capabilities
+    install -m755 ${../out/gpu/libbbgpu.so} $d/bin/gpu/libbbgpu.so
+    install -m755 ${../out/fex/libbbcpu.so} $d/bin/cpu/libbbcpu.so
 
     substitute ${./runtime-run.sh} $out/opt/bbport/bin/bbport \
       --replace-fail @PYTHON@ ${python}/bin/python3 \
