@@ -1,0 +1,111 @@
+name: Build self-sufficient Nix rootfs
+
+# Builds a proot/chroot-ready rootfs whose contents are entirely built and
+# bundled by Nix. Differs from runtime-tar.yml in two ways: it includes a
+# minimal /etc, /bin and /usr so the rootfs is self-sufficient (the runtime
+# tar is an overlay designed to be extracted INTO an existing rootfs), and it
+# bundles libffi, libxcb, libwayland, libzstd in the closure so an imported
+# Mesa driver does not need the host /usr/lib to resolve its dependencies.
+on:
+  workflow_dispatch:
+    inputs:
+      runs_on:
+        description: 'JSON runs-on value. Default uses GitHub-hosted ARM64; use ["self-hosted","linux","arm64"] for your own runner.'
+        required: true
+        default: '"ubuntu-24.04-arm"'
+      version:
+        description: Rootfs version suffix
+        required: true
+        default: r1
+      release_tag:
+        description: 'Release tag. Empty skips release upload.'
+        required: false
+        default: 'nix-rootfs-latest'
+
+jobs:
+  build:
+    name: Build self-sufficient Nix rootfs
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check runner architecture
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = aarch64
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # The closure shared with runtime-tar.yml is keyed the same way; once one
+      # workflow has built it, the other starts from a warm cache.
+      - name: Cache Nix store
+        uses: actions/cache@v4
+        with:
+          path: |
+            /nix/store
+            ~/.cache/nix
+          key: nix-${{ runner.os }}-${{ hashFiles('shell.nix', 'packaging/runtime-tar.nix', 'packaging/nix-rootfs/nix-rootfs.nix', 'packaging/nix-rootfs/runtime-run.sh', '.github/workflows/nix-rootfs.yml') }}
+          restore-keys: |
+            nix-${{ runner.os }}-
+
+      - name: Build bbport runtime
+        env:
+          BB_NIXPKGS: channel:nixos-unstable
+        run: nix-shell -I nixpkgs=$BB_NIXPKGS shell.nix --run 'bash build.sh'
+
+      - name: Build driverless runtime tar (closure driver)
+        # The driverless runtime tar writes packaging/runtime-paths.nix from
+        # readelf on the bbport binaries. nix-rootfs reuses that list as its
+        # runtime closure, so we need the list to exist before nix-rootfs builds.
+        env:
+          BB_NIXPKGS: channel:nixos-unstable
+        run: bash packaging/runtime-tar.sh
+
+      - name: Build self-sufficient Nix rootfs
+        env:
+          BB_NIXPKGS: channel:nixos-unstable
+          BLOODBORNE_NIX_ROOTFS_VERSION: ${{ inputs.version }}
+        run: bash packaging/nix-rootfs/build-nix-rootfs.sh
+
+      - name: Check rootfs contents
+        run: bash packaging/nix-rootfs/check-nix-rootfs.sh dist/bloodborne-nix-rootfs-aarch64-${{ inputs.version }}.tar.zst
+
+      - name: Report sizes
+        run: |
+          set -euo pipefail
+          echo "== nix rootfs artifacts"
+          ls -lh dist/bloodborne-nix-rootfs-*
+
+      - name: Upload rootfs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bloodborne-nix-rootfs-${{ inputs.version }}
+          path: dist/bloodborne-nix-rootfs-aarch64-${{ inputs.version }}.tar.zst
+          if-no-files-found: error
+
+      - name: Upload to release
+        if: inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ARCHIVE: dist/bloodborne-nix-rootfs-aarch64-${{ inputs.version }}.tar.zst
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --title "$RELEASE_TAG" \
+              --notes "Self-sufficient bbport Nix rootfs from ${GITHUB_SHA}." \
+              --prerelease
+          fi
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" --clobber
