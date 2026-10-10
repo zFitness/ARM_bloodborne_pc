@@ -63,6 +63,20 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      # The build has two heavy phases:
+      #   1. build.sh  (gcc + cmake + ninja) — NOT cached here, would need ccache.
+      #   2. nix-build packaging/runtime-tar.nix — pulls / builds a closure from
+      #      nixpkgs. Subsequent runs hit /nix/store and finish fast, so cache it.
+      - name: Cache Nix store
+        uses: actions/cache@v4
+        with:
+          path: |
+            /nix/store
+            ~/.cache/nix
+          key: nix-${{ runner.os }}-${{ hashFiles('shell.nix', 'packaging/runtime-tar.nix', 'packaging/default.nix', '.github/workflows/rootfs-debian.yml') }}
+          restore-keys: |
+            nix-${{ runner.os }}-
+
       - name: Build bbport runtime
         # Same first half as rootfs.yml: the Nix closure that produces the driverless
         # runtime tar. The Debian rootfs unpacks that tarball rather than carrying the
