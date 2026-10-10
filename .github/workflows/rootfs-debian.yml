@@ -86,13 +86,16 @@ jobs:
           BB_DEBIAN_MIRROR: ${{ inputs.debian_mirror }}
           BBPORT_RUNTIME_TARBALL: ${{ format('{0}/dist/Bloodborne-bbport-runtime-aarch64.tar.gz', github.workspace) }}
         # Needs root for chroot; add-debian-extras.sh falls back to proot without it.
-        run: sudo -E env \
-          "BLOODBORNE_ROOTFS_VERSION=$BLOODBORNE_ROOTFS_VERSION" \
-          "BB_DEBIAN_SUITE=$BB_DEBIAN_SUITE" \
-          "BB_DEBIAN_MIRROR=$BB_DEBIAN_MIRROR" \
-          "BBPORT_RUNTIME_TARBALL=$BBPORT_RUNTIME_TARBALL" \
-          WORK_DIR="${{ github.workspace }}/.work/rootfs-debian" \
-          DIST_DIR="${{ github.workspace }}/dist" \
+        # One-line run so YAML literal-block indentation does not prepend spaces to
+        # the bash argument (env would then look up a program named " bash").
+        run: >
+          sudo -E env
+          "BLOODBORNE_ROOTFS_VERSION=$BLOODBORNE_ROOTFS_VERSION"
+          "BB_DEBIAN_SUITE=$BB_DEBIAN_SUITE"
+          "BB_DEBIAN_MIRROR=$BB_DEBIAN_MIRROR"
+          "BBPORT_RUNTIME_TARBALL=$BBPORT_RUNTIME_TARBALL"
+          "WORK_DIR=${{ github.workspace }}/.work/rootfs-debian"
+          "DIST_DIR=${{ github.workspace }}/dist"
           bash packaging/rootfs-debian/scripts/build-debian-rootfs.sh
 
       - name: Report sizes
