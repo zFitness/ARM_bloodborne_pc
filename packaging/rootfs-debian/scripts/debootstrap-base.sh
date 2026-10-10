@@ -4,8 +4,10 @@
 #   debootstrap-base.sh <stage-dir>
 #
 # Runs inside the proot-distro Debian container, or anywhere with root and debootstrap.
-# Emits an env file with BASE_* assignments on stdout, like fetch-base-linuxfs.sh does for
-# the DroidDeck path, so the caller can source the result.
+#
+# Output contract: the absolute path of the env file on stdout. The caller's
+# `env_file=$(...)` captures that and sources it for the BASE_* variables. All
+# progress logs go to stderr so they do not pollute the captured value.
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -26,9 +28,9 @@ if [[ ! $(command -v debootstrap) ]]; then
 fi
 
 if [[ -e $stage ]]; then
-    echo "== debian base: reusing existing $stage"
+    echo "== debian base: reusing existing $stage" >&2
 else
-    echo "== debian base: debootstrap --variant=minbase $suite ($mirror)"
+    echo "== debian base: debootstrap --variant=minbase $suite ($mirror)" >&2
     mkdir -p "$stage"
     # --variant=minbase trims priority:required packages that the default base pulls in.
     # The extras bbport actually needs are installed by add-debian-extras.sh with an
@@ -49,7 +51,6 @@ done
 # debootstrap leaves its log behind; it is build noise, not part of the rootfs.
 rm -f "$stage/debootstrap.log"
 
-bb_read_base_version "$stage"
 {
     bb_env_assignment BASE_VERSION "$suite"
     bb_env_assignment BASE_URL "$mirror"
@@ -59,4 +60,5 @@ bb_read_base_version "$stage"
     bb_env_assignment BASE_SIZE "$(bb_dir_size "$stage")"
 } > "$env_file"
 
+# Only the env file path on stdout; everything else went to stderr above.
 echo "$env_file"
