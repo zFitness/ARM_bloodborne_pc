@@ -72,17 +72,6 @@ jobs:
           BB_NIXPKGS: channel:nixos-unstable
         run: bash packaging/runtime-tar.sh
 
-      - name: Upload driverless runtime tar artifact
-        # Even though nix-rootfs is the primary artifact of this workflow, the
-        # underlying runtime tar is also worth inspecting on its own (size,
-        # closure contents). Mirrors the upload step in runtime-tar.yml so the
-        # artifact name lines up across workflows.
-        uses: actions/upload-artifact@v4
-        with:
-          name: bbport-runtime-aarch64-tar
-          path: dist/Bloodborne-bbport-runtime-aarch64.tar.gz
-          if-no-files-found: error
-
       - name: Build self-sufficient Nix rootfs
         env:
           BB_NIXPKGS: channel:nixos-unstable
