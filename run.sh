@@ -216,6 +216,15 @@ fi
 if declare -F bb_android_apply_library_path >/dev/null; then
     bb_android_apply_library_path
 fi
+# Android/Termux audio: route the guest's SDL3 audio to the host Termux PulseAudio.
+# BB_TERMUX_AUDIO=1 turns it on; the host route (native-protocol-tcp on 127.0.0.1) is set
+# up by my-docs/debug/血源-音频.sh. Off by default: desktop/AppImage audio is unchanged.
+# The guest has no pulseaudio binary, so a server address is mandatory (no autospawn).
+if [[ ${BB_TERMUX_AUDIO:-0} == 1 ]]; then
+    export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-pulseaudio}
+    export PULSE_SERVER=${BB_TERMUX_AUDIO_SERVER:-tcp:127.0.0.1:${BB_TERMUX_AUDIO_PORT:-4713}}
+    echo "Termux audio: SDL_AUDIODRIVER=$SDL_AUDIODRIVER PULSE_SERVER=$PULSE_SERVER"
+fi
 probe_args=("$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" --app0 "$game" --user "${BB_USER_DIR:-$data/user}" --timeout "${BB_TIMEOUT:-0}" "$@")
 if [[ -n ${mod_game:-} ]]; then
     "$probe" "${probe_args[@]}" &
