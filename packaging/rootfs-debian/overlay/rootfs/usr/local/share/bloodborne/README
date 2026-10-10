@@ -1,0 +1,51 @@
+# Bloodborne on Debian (trixie) ARM64 rootfs
+
+This rootfs contains the bbport runtime and nothing else you did not put there.
+
+## What is here
+
+- `/opt/bbport` — the runtime: `bin/bbport` is the entry point, `bin/bbport-driver`
+  manages imported Vulkan drivers, `share/bbport/` holds the runtime scripts.
+- `/usr/local/bin/bloodborne-launch` — prepares a data directory and starts the runtime.
+- `apt` — a normal Debian package manager.
+
+## What is not here
+
+- No game files. You need your own Bloodborne CUSA03173 v1.09 dump.
+- No Vulkan driver. This is deliberate; see below.
+
+## Installing a Vulkan driver
+
+Either install one from Debian:
+
+    apt-get update
+    apt-get install -y mesa-vulkan-drivers
+
+or import a Linux/rootfs driver package:
+
+    /opt/bbport/bin/bbport-driver import /path/to/linux-vulkan-driver.zip
+
+`bbport-driver` rejects Android-app and AdrenoTools-only packages: those inject into
+Android's graphics stack and expose no Linux Vulkan ICD. You need a package containing
+ICD JSON files and aarch64 driver libraries.
+
+## Running
+
+    BB_GAME_DIR=/games/CUSA03173 /usr/local/bin/bloodborne-launch
+
+Useful environment variables:
+
+- `BB_GAME_DIR` — directory holding `eboot.bin`
+- `BB_DATA_DIR` — writable directory for saves, settings, shader cache and imported
+  drivers. Defaults to `/opt/bbport-data`. Keep it on real storage: FUSE-backed paths
+  such as `/sdcard` make loading and shader cache access slow.
+- `BB_ANDROID_ROOTFS_PROFILE=0` — disable the Android rootfs performance profile
+- `BB_FRAME_STATS=1` — per-frame statistics
+- `BB_BREADCRUMBS=1` — GPU command trace, for diagnosing a hang
+- `BB_SAVE_LOG=1` — write this run's output to `$BB_DATA_DIR/logs/`
+
+## Diagnostics
+
+    /opt/bbport/bin/bbport --vulkan-info
+    /opt/bbport/bin/bbport-driver list
+    vulkaninfo --summary
