@@ -45,9 +45,11 @@ if [[ -e $stage ]]; then
 fi
 
 echo "== debian rootfs: base ($suite)"
-env_file="$("$script_dir/debootstrap-base.sh" "$stage")"
-# shellcheck disable=SC1090
-source "$env_file"
+# debootstrap-base.sh writes BASE_* assignments to stdout (see its contract).
+# We use eval rather than sourcing a file: the previous version wrote a
+# base-debian.env that the GHA runner's overlay filesystem refused to open
+# with ENAMETOOLONG after debootstrap finished.
+eval "$("$script_dir/debootstrap-base.sh" "$stage")"
 echo "   base version: $BASE_VERSION"
 
 echo "== debian rootfs: runtime dependencies"

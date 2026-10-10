@@ -5,9 +5,18 @@
 #
 # Runs inside the proot-distro Debian container, or anywhere with root and debootstrap.
 #
-# Output contract: the absolute path of the env file on stdout. The caller's
-# `env_file=$(...)` captures that and sources it for the BASE_* variables. All
-# progress logs go to stderr so they do not pollute the captured value.
+# Output contract: prints KEY=VALUE lines to stdout, one per line, with values
+# shell-escaped via printf %q. The caller runs them through `eval` to import the
+# variables (BASE_VERSION, BASE_URL). debootstrap's own output is rerouted to
+# stderr so it does not pollute the captured value stream. Progress logs from
+# this script also go to stderr.
+#
+# Why not a file: the previous version wrote an env file at
+# $(dirname "$stage")/base-debian.env and the caller sourced it. On the
+# GitHub Actions runner, the open() of that file failed with ENAMETOOLONG
+# (most likely a side effect of `du` walking the freshly-bootstrapped rootfs
+# on the overlay filesystem), and bash reported the redirection target as the
+# failing path. Stdout-as-value-stream removes the file from the picture.
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -20,7 +29,6 @@ stage="${1:-}"
 
 suite="${BB_DEBIAN_SUITE:-trixie}"
 mirror="${BB_DEBIAN_MIRROR:-http://deb.debian.org/debian}"
-env_file="$(dirname -- "$stage")/base-debian.env"
 
 if [[ ! $(command -v debootstrap) ]]; then
     echo 'Need debootstrap (Debian: apt install debootstrap debian-archive-keyring).' >&2
@@ -35,9 +43,11 @@ else
     # --variant=minbase trims priority:required packages that the default base pulls in.
     # The extras bbport actually needs are installed by add-debian-extras.sh with an
     # explicit list, so nothing here is implied by debootstrap's defaults.
+    # Both stdout and stderr from debootstrap go to stderr: the stdout path is the
+    # variable stream that the caller evals.
     debootstrap --arch=arm64 --variant=minbase \
         --include=ca-certificates,apt-utils \
-        "$suite" "$stage" "$mirror"
+        "$suite" "$stage" "$mirror" >&2
 fi
 
 echo "== debian base: verifying layout" >&2
@@ -51,14 +61,11 @@ done
 # debootstrap leaves its log behind; it is build noise, not part of the rootfs.
 rm -f "$stage/debootstrap.log"
 
-{
-    bb_env_assignment BASE_VERSION "$suite"
-    bb_env_assignment BASE_URL "$mirror"
-    bb_env_assignment BASE_ARCHIVE ""
-    bb_env_assignment BASE_CATALOG ""
-    bb_env_assignment BASE_SHA256 ""
-    bb_env_assignment BASE_SIZE "$(bb_dir_size "$stage")"
-} > "$env_file"
-
-# Only the env file path on stdout; everything else went to stderr above.
-echo "$env_file"
+# Variable stream on stdout. Only BASE_VERSION and BASE_URL are actually consumed
+# by the caller; the others are emitted for symmetry and so a future caller can
+# inspect provenance without going back to the stage.
+bb_env_assignment BASE_VERSION "$suite"
+bb_env_assignment BASE_URL "$mirror"
+bb_env_assignment BASE_ARCHIVE ""
+bb_env_assignment BASE_CATALOG ""
+bb_env_assignment BASE_SHA256 ""
