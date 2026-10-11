@@ -2716,10 +2716,13 @@ bool VramTrapHandler(void* context, void* fault_address) {
             return false;
         }
     }
-    const auto* g = static_cast<const ucontext_t*>(context)->uc_mcontext.gregs;
-    const u64 rip = u64(g[REG_RIP]);
+    const u64 rip = u64(Common::GetRip(context));
     constexpr u64 Image = 0x800000000ull, ImageEnd = 0x810000000ull;
     u64 caller = 0;
+#if defined(__x86_64__)
+    // bbport: the guest caller is the first guest address on the host stack. That holds only on
+    // x86-64; on aarch64 the guest runs in FEXCore's JIT and the host stack has no guest addresses.
+    const auto* g = static_cast<const ucontext_t*>(context)->uc_mcontext.gregs;
     const auto* stack = reinterpret_cast<const u64*>(g[REG_RSP]);
     for (u32 i = 0; i < 48; ++i) {
         if (stack[i] >= Image && stack[i] < ImageEnd) {
@@ -2727,6 +2730,7 @@ bool VramTrapHandler(void* context, void* fault_address) {
             break;
         }
     }
+#endif
     const bool write = Common::IsWriteError(context);
     const u64 site = (rip >= Image && rip < ImageEnd ? rip - Image : rip | (1ull << 63)) ^
                      (write ? 1ull << 62 : 0);

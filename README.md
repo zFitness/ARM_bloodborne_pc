@@ -412,6 +412,13 @@ from The Hunter's Dream, bells and summons go through a shadNet server (`srv.sha
 default) with a shadNet account (Online ID and password). Offline the module is never loaded; a
 build without it plays offline only.
 
+**ARM64 fork note (upstream 0.51).** This `arm64-fex` tree tracks upstream
+`deadinside28/bloodborne_pc` 0.51. The online module (`gpu/bbnet`) and the DLSS bridge
+(`gpu/dlss_bridge`) are merged and gated (built/loaded only when their dependencies are present and,
+for online, `BB_ONLINE=1`), but are **not verified on aarch64**: DLSS is NVIDIA x86-64 only (not
+built on aarch64), and online play needs the module built and tested on a device. See
+[my-docs/upstream-merge-0.51.md](my-docs/upstream-merge-0.51.md).
+
 ## Repository layout
 
 | Path | Contents |
