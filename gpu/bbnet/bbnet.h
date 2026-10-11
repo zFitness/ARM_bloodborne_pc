@@ -12,6 +12,15 @@ extern "C" {
 
 #define BBNET_ABI_VERSION 1
 
+/* The guest's calling convention for callbacks into the game: System V on x86-64; elsewhere
+ * (aarch64) the guest CPU (guest_cpu.h) converts guest calls to the host ABI, so the attribute
+ * is dropped (the same guard as src/runtime.h's ABI and shadPS4's PS4_SYSV_ABI). */
+#if defined(__x86_64__)
+#define BBNET_SYSV_ABI __attribute__((sysv_abi))
+#else
+#define BBNET_SYSV_ABI
+#endif
+
 /* What the runtime gives the module: the game's identity (param.sfo, its folder for
  * sce_sys/npbind.dat) and guest threads for the NP libraries' callbacks into the game. */
 typedef struct BbNetHost {
@@ -21,7 +30,7 @@ typedef struct BbNetHost {
     const char *title;      /* TITLE */
     const char *app_ver;    /* APP_VER */
     /* 0 or a positive errno value; entry has the System V ABI (the game's code calls it). */
-    int32_t (*thread_spawn)(void **thread, void *(__attribute__((sysv_abi)) *entry)(void *),
+    int32_t (*thread_spawn)(void **thread, void *(*BBNET_SYSV_ABI entry)(void *),
                             void *argument, uint64_t stack_size, const char *name);
     int32_t (*thread_join)(void *thread, void **result);
 } BbNetHost;
